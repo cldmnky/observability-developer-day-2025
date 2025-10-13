@@ -50,8 +50,15 @@ async def get_seed():
     """
     Generate a random seed value for lolcat colorization
     Returns a seed between 0.0 and 1000.0
+    Simulates processing delay between 0.1s and 5s
     """
     import time
+    import asyncio
+    
+    # Add random delay to simulate processing time
+    delay = random.uniform(0.1, 5.0)
+    await asyncio.sleep(delay)
+    
     seed = random.uniform(0.0, 1000.0)
     return SeedResponse(
         seed=round(seed, 2),

@@ -6,6 +6,7 @@ A FastAPI-based service that generates random seed values for lolcat colorizatio
 
 - FastAPI framework for high performance
 - Random seed generation (0.0 - 1000.0)
+- Simulated processing delay (0.1s - 5s) for observability testing
 - Health check endpoint
 - CORS enabled for cross-origin requests
 - Configurable port via PORT environment variable

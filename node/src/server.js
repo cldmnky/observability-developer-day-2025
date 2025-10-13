@@ -11,6 +11,56 @@ const GO_API_BASE = process.env.GO_API_BASE || 'http://localhost:4001';
 const QUARKUS_API_BASE = process.env.QUARKUS_API_BASE || 'http://localhost:4003';
 const PYTHON_API_BASE = process.env.PYTHON_API_BASE || 'http://localhost:4004';
 
+// Statistics for background worker
+const stats = {
+  totalRequests: 0,
+  successfulRequests: 0,
+  failedRequests: 0,
+  lastSeed: null,
+  lastGeneratedName: null,
+  lastTimestamp: null,
+  startTime: Date.now()
+};
+
+// Background worker to continuously query seed API and generate names
+async function backgroundWorker() {
+  while (true) {
+    try {
+      stats.totalRequests++;
+      
+      // Get seed from Python API
+      const seedResponse = await fetch(`${PYTHON_API_BASE}/api/seed`);
+      if (seedResponse.ok) {
+        const seedData = await seedResponse.json();
+        stats.lastSeed = seedData.seed;
+        stats.lastTimestamp = new Date(seedData.timestamp * 1000).toISOString();
+        
+        // Generate name from Go API using the seed
+        const nameResponse = await fetch(`${GO_API_BASE}/api/name?seed=${seedData.seed}`);
+        if (nameResponse.ok) {
+          const nameData = await nameResponse.json();
+          stats.lastGeneratedName = nameData.names[0]?.combined || 'unknown';
+          stats.successfulRequests++;
+          
+          console.log(`[Worker] Generated: ${stats.lastGeneratedName} (seed: ${stats.lastSeed})`);
+        } else {
+          stats.failedRequests++;
+          console.error('[Worker] Failed to generate name');
+        }
+      } else {
+        stats.failedRequests++;
+        console.error('[Worker] Failed to fetch seed');
+      }
+    } catch (error) {
+      stats.failedRequests++;
+      console.error('[Worker] Error:', error.message);
+    }
+    
+    // Small delay before next request
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+}
+
 // Parse JSON bodies
 app.use(express.json());
 
@@ -20,6 +70,21 @@ app.use(express.static(join(__dirname, '..', 'public')));
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'name-generator-web' });
+});
+
+// Background worker statistics endpoint
+app.get('/api/worker/stats', (req, res) => {
+  const uptime = Math.floor((Date.now() - stats.startTime) / 1000);
+  const successRate = stats.totalRequests > 0 
+    ? ((stats.successfulRequests / stats.totalRequests) * 100).toFixed(2)
+    : 0;
+  
+  res.json({
+    ...stats,
+    uptime,
+    successRate: `${successRate}%`,
+    requestsPerSecond: uptime > 0 ? (stats.totalRequests / uptime).toFixed(2) : 0
+  });
 });
 
 // Proxy endpoint for Go API - Get names
@@ -140,6 +205,15 @@ app.listen(PORT, () => {
 ║   - Quarkus API: ${QUARKUS_API_BASE}                    ║
 ║   - Python API:  ${PYTHON_API_BASE}                    ║
 ║                                                           ║
+║   Background worker: ACTIVE                              ║
+║   Stats endpoint: /api/worker/stats                      ║
+║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
   `);
+  
+  // Start background worker
+  console.log('[Worker] Starting background worker...');
+  backgroundWorker().catch(err => {
+    console.error('[Worker] Fatal error:', err);
+  });
 });
