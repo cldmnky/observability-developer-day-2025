@@ -36,8 +36,10 @@ COPY --from=builder /workspace/target/quarkus-app/*.jar ./
 COPY --from=builder /workspace/target/quarkus-app/app/ ./app/
 COPY --from=builder /workspace/target/quarkus-app/quarkus/ ./quarkus/
 
-# Change ownership to default user
-RUN chown -R 1001:0 /app
+# Set ownership to root group and ensure group has same permissions as owner
+# This allows OpenShift to run the container with arbitrary UIDs in the root group
+RUN chgrp -R 0 /app && \
+    chmod -R g=u /app
 
 # Run as non-root user (default in UBI)
 USER 1001

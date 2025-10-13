@@ -33,6 +33,12 @@ WORKDIR /app
 COPY --from=builder /workspace/api .
 COPY go/data/*.csv ./data/
 
+# Set ownership to root group and ensure group has same permissions as owner
+# This allows OpenShift to run the container with arbitrary UIDs in the root group
+RUN chgrp -R 0 /app && \
+    chmod -R g=u /app && \
+    chmod +x /app/api
+
 # Run as non-root user (default in UBI)
 USER 1001
 
