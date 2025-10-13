@@ -41,9 +41,16 @@ The gateway uses OpenShift OAuth for authentication. You'll need to:
    - Duration
 
 ### Via Jaeger UI (Gateway)
-Access the Jaeger Query UI directly:
+Access the Jaeger Query UI directly at these URLs:
+
+**Dev Tenant:**
 ```
-https://tempo-tempo-gateway-openshift-tempo-operator.apps.borg.blahonga.me
+https://tempo-tempo-gateway-openshift-tempo-operator.apps.borg.blahonga.me/api/traces/v1/dev/search
+```
+
+**Prod Tenant:**
+```
+https://tempo-tempo-gateway-openshift-tempo-operator.apps.borg.blahonga.me/api/traces/v1/prod/search
 ```
 
 The UI provides:
