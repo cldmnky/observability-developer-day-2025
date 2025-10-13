@@ -1,0 +1,19 @@
+{
+  "name": "observability-name-client",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Web app that queries the Go name generator API and renders ASCII art in a browser terminal",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.1"
+  }
+}

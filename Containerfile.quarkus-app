@@ -1,0 +1,45 @@
+# Multi-arch build for Quarkus lolcat service
+# Supports aarch64 and amd64
+
+FROM --platform=$BUILDPLATFORM docker.io/library/maven:3.9-eclipse-temurin-21 AS builder
+
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+
+WORKDIR /workspace
+
+# Copy pom.xml
+COPY quarkus/pom.xml ./
+
+# Download dependencies
+RUN mvn dependency:go-offline
+
+# Copy source code
+COPY quarkus/src ./src
+
+# Build the application
+RUN mvn clean package -DskipTests
+
+# Final stage - use Quarkus's recommended JVM runtime image
+FROM --platform=$TARGETPLATFORM docker.io/library/eclipse-temurin:21-jre-alpine
+
+WORKDIR /app
+
+# Copy the Quarkus app from builder
+COPY --from=builder /workspace/target/quarkus-app/lib/ ./lib/
+COPY --from=builder /workspace/target/quarkus-app/*.jar ./
+COPY --from=builder /workspace/target/quarkus-app/app/ ./app/
+COPY --from=builder /workspace/target/quarkus-app/quarkus/ ./quarkus/
+
+# Run as non-root user
+RUN addgroup -S appuser && \
+    adduser -S -G appuser appuser && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
+EXPOSE 4003
+
+ENV PORT=4003
+
+CMD ["java", "-jar", "quarkus-run.jar"]

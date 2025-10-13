@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASCII Name Generator</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+        sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      flex: 1;
+    }
+    .header {
+      background: rgba(255, 255, 255, 0.95);
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+    .header h1 {
+      font-size: 32px;
+      color: #2d3748;
+      margin-bottom: 8px;
+    }
+    .header p {
+      color: #718096;
+      font-size: 16px;
+    }
+    .controls {
+      background: rgba(255, 255, 255, 0.95);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .control-group label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #4a5568;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .control-group input {
+      padding: 8px 12px;
+      border: 2px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+      width: 120px;
+    }
+    .control-group input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    button {
+      padding: 10px 20px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: auto;
+    }
+    button:hover {
+      background: #5a67d8;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .terminal-container {
+      background: rgba(0, 0, 0, 0.9);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      flex: 1;
+      min-height: 600px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #terminal {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+    }
+    .status {
+      padding: 12px 20px;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .status.loading {
+      background: #edf2f7;
+      color: #4a5568;
+    }
+    .status.error {
+      background: #fed7d7;
+      color: #c53030;
+    }
+    .status.success {
+      background: #c6f6d5;
+      color: #22543d;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎨 ASCII Name Generator</h1>
+      <p>Generate beautiful ASCII art from random adjective-animal combinations</p>
+    </div>
+    
+    <div class="controls">
+      <div class="control-group">
+        <label>Count</label>
+        <input type="number" id="count" min="1" max="10" value="3">
+      </div>
+      <div class="control-group">
+        <label>Seed (optional)</label>
+        <input type="text" id="seed" placeholder="demo-seed">
+      </div>
+      <div class="control-group">
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 16px;">
+          <input type="checkbox" id="useLolcat" style="width: auto; cursor: pointer;">
+          <span>🌈 Use Lolcat Colors</span>
+        </label>
+      </div>
+      <button id="generate">Generate Names</button>
+      <button id="clear">Clear Terminal</button>
+    </div>
+    
+    <div class="terminal-container">
+      <div id="terminal"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+  <script type="module">
+    // All API calls now go through the Node.js server proxy
+    // No need for absolute URLs - use relative paths
+    
+    // Initialize terminal
+    const term = new Terminal({
+      cursorBlink: false,
+      fontSize: 12,
+      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      cols: 120,
+      rows: 40,
+      scrollback: 1000,
+      theme: {
+        background: '#1a202c',
+        foreground: '#e2e8f0',
+        cursor: '#667eea',
+        black: '#1a202c',
+        red: '#fc8181',
+        green: '#68d391',
+        yellow: '#f6e05e',
+        blue: '#63b3ed',
+        magenta: '#b794f4',
+        cyan: '#4fd1c5',
+        white: '#e2e8f0',
+        brightBlack: '#4a5568',
+        brightRed: '#feb2b2',
+        brightGreen: '#9ae6b4',
+        brightYellow: '#faf089',
+        brightBlue: '#90cdf4',
+        brightMagenta: '#d6bcfa',
+        brightCyan: '#81e6d9',
+        brightWhite: '#f7fafc'
+      }
+    });
+    
+    const fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(document.getElementById('terminal'));
+    fitAddon.fit();
+    
+    window.addEventListener('resize', () => {
+      fitAddon.fit();
+    });
+    
+    // Utility functions
+    async function lolcatColorize(text) {
+      try {
+        // Validate input
+        if (!text || text.trim().length === 0) {
+          console.warn('Empty text passed to lolcatColorize');
+          return text;
+        }
+        
+        const response = await fetch('/api/lolcat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: text,
+            seed: 0.0,
+            spread: 3.0,
+            freq: 0.1
+          })
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Lolcat API error: ${response.status} ${response.statusText} - ${errorText}`);
+        }
+        
+        const { colorized } = await response.json();
+        return colorized;
+      } catch (error) {
+        console.warn('Lolcat colorization failed, using plain text:', error);
+        return text;
+      }
+    }
+    
+    function writeLine(text, color = null) {
+      // Note: writeLine should NOT use lolcat - that's only for ASCII art figures
+      if (color) {
+        term.write(`\x1b[${color}m${text}\x1b[0m\r\n`);
+      } else {
+        term.write(text + '\r\n');
+      }
+    }
+    
+    function writeRaw(text) {
+      // Write text without adding line break, preserving exact formatting
+      const lines = text.split('\n');
+      lines.forEach((line, index) => {
+        term.write(line);
+        if (index < lines.length - 1) {
+          term.write('\r\n');
+        }
+      });
+      term.write('\r\n');
+    }
+    
+    function writeHeader() {
+      writeLine('═'.repeat(80), '36'); // cyan
+      writeLine('  ASCII NAME GENERATOR', '1;36'); // bold cyan
+      writeLine('═'.repeat(80), '36');
+      writeLine('');
+    }
+    
+    async function fetchNames(count, seed) {
+      const params = new URLSearchParams();
+      if (count) params.set('count', count);
+      if (seed) params.set('seed', seed);
+      
+      const response = await fetch(`/api/name?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch names: ${response.statusText}`);
+      }
+      
+      const { names } = await response.json();
+      return names.map(n => n.combined);
+    }
+    
+    async function fetchFiglet(names) {
+      const response = await fetch('/api/figlet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ names })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to render figlet: ${response.statusText}`);
+      }
+      
+      const { art } = await response.json();
+      return art;
+    }
+    
+    async function generateAndDisplay() {
+      const countInput = document.getElementById('count');
+      const seedInput = document.getElementById('seed');
+      const generateBtn = document.getElementById('generate');
+      const useLolcat = document.getElementById('useLolcat').checked;
+      
+      const count = parseInt(countInput.value) || 3;
+      const seed = seedInput.value.trim() || null;
+      
+      generateBtn.disabled = true;
+      
+      try {
+        writeLine('⏳ Fetching names...', '33'); // yellow
+        const names = await fetchNames(count, seed);
+        
+        writeLine(`✓ Retrieved ${names.length} names`, '32'); // green
+        writeLine('⏳ Generating ASCII art...', '33');
+        
+        const artResults = await fetchFiglet(names);
+        
+        writeLine('✓ ASCII art generated!', '32');
+        writeLine('');
+        
+        for (const { name, figure } of artResults) {
+          writeLine('─'.repeat(80), '35'); // magenta
+          writeLine(`  ${name}`, '1;32'); // bold green
+          writeLine('─'.repeat(80), '35');
+          writeLine('');
+          
+          // Write ASCII art with cyan color or lolcat, preserving exact formatting
+          if (useLolcat) {
+            console.log('Colorizing with lolcat, figure length:', figure ? figure.length : 'undefined');
+            const colorizedArt = await lolcatColorize(figure);
+            if (colorizedArt) {
+              writeRaw(colorizedArt);
+            } else {
+              // Fallback to cyan if lolcat fails
+              console.warn('Lolcat returned empty, using fallback');
+              term.write('\x1b[36m'); // cyan
+              writeRaw(figure);
+              term.write('\x1b[0m'); // reset
+            }
+          } else {
+            term.write('\x1b[36m'); // cyan
+            writeRaw(figure);
+            term.write('\x1b[0m'); // reset
+          }
+          writeLine('');
+        }
+        
+        writeLine('═'.repeat(80), '36');
+        writeLine(`✨ Generated ${artResults.length} ASCII art pieces!`, '1;32');
+        writeLine('═'.repeat(80), '36');
+        writeLine('');
+        
+      } catch (error) {
+        writeLine('');
+        writeLine('❌ ERROR:', '1;31'); // bold red
+        writeLine(error.message, '31'); // red
+        writeLine('');
+        writeLine('Make sure all backend services are running:', '33');
+        writeLine('  - Go API (port 8080)', '33');
+        if (document.getElementById('useLolcat').checked) {
+          writeLine('  - Quarkus lolcat API (port 8081)', '33');
+        }
+        writeLine('');
+        writeLine('Run: make dev', '36'); // cyan
+        writeLine('');
+      } finally {
+        generateBtn.disabled = false;
+      }
+    }
+    
+    // Event handlers
+    document.getElementById('generate').addEventListener('click', generateAndDisplay);
+    document.getElementById('clear').addEventListener('click', () => {
+      term.clear();
+      writeHeader();
+    });
+    
+    document.getElementById('count').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') generateAndDisplay();
+    });
+    
+    document.getElementById('seed').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') generateAndDisplay();
+    });
+    
+    // Initial header
+    writeHeader();
+    writeLine('Click "Generate Names" to start, or press Enter in any input field', '2'); // dim
+    writeLine('');
+  </script>
+</body>
+</html>

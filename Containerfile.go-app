@@ -1,0 +1,46 @@
+# Multi-arch build for Go name generator service
+# Supports aarch64 and amd64
+
+FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.24-alpine AS builder
+
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
+
+WORKDIR /workspace
+
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY go/ ./go/
+
+# Build the binary for the target architecture
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -a -installsuffix cgo -o /app/api ./go/cmd/api
+
+# Final stage - minimal runtime image
+FROM --platform=$TARGETPLATFORM docker.io/library/alpine:latest
+
+RUN apk --no-cache add ca-certificates
+
+WORKDIR /app
+
+# Copy the binary from builder
+COPY --from=builder /app/api .
+COPY go/data/*.csv ./data/
+
+# Run as non-root user
+RUN addgroup -S appuser && \
+    adduser -S -G appuser appuser && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
+EXPOSE 4001
+
+ENV PORT=4001
+
+CMD ["./api"]

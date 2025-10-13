@@ -1,0 +1,31 @@
+# Multi-arch build for Node.js web application
+# Supports aarch64 and amd64
+
+FROM --platform=$TARGETPLATFORM docker.io/library/node:20-alpine
+
+ARG TARGETPLATFORM
+
+WORKDIR /app
+
+# Copy package files
+COPY node/package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy application source
+COPY node/src/ ./src/
+COPY node/public/ ./public/
+
+# Run as non-root user
+RUN addgroup -S appuser && \
+    adduser -S -G appuser appuser && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
+EXPOSE 4002
+
+ENV PORT=4002
+
+CMD ["npm", "start"]
