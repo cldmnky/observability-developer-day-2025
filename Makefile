@@ -163,12 +163,21 @@ start: python-check-env ## Start all services in background (requires tmux)
 stop: ## Stop all services running in tmux
 	@echo "$(YELLOW)Stopping all services...$(NC)"
 	@tmux kill-session -t observability-dev 2>/dev/null || echo "$(YELLOW)No tmux session found$(NC)"
-	@echo "$(YELLOW)Cleaning up orphaned processes...$(NC)"
-	@pkill -9 -f "quarkus:dev" 2>/dev/null || true
-	@pkill -9 -f "lolcat-service-dev.jar" 2>/dev/null || true
-	@pkill -9 -f "go/bin/api" 2>/dev/null || true
-	@pkill -9 -f "python.*app.py" 2>/dev/null || true
-	@pkill -9 -f "node.*src/server.js" 2>/dev/null || true
+	@echo "$(YELLOW)Checking for processes on service ports...$(NC)"
+	@killed=0; \
+	for port in $(GO_PORT) $(NODE_PORT) $(QUARKUS_PORT) $(PYTHON_PORT); do \
+		pid=$$(lsof -ti tcp:$$port 2>/dev/null); \
+		if [ -n "$$pid" ]; then \
+			echo "  $(YELLOW)Killing process $$pid on port $$port$(NC)"; \
+			kill -9 $$pid 2>/dev/null || true; \
+			killed=$$((killed + 1)); \
+		fi; \
+	done; \
+	if [ $$killed -eq 0 ]; then \
+		echo "  $(GREEN)No processes found on service ports$(NC)"; \
+	else \
+		echo "  $(GREEN)Killed $$killed process(es)$(NC)"; \
+	fi
 	@sleep 1
 	@echo "$(GREEN)✓ All services stopped$(NC)"
 
