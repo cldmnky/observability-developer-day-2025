@@ -1,6 +1,7 @@
 .PHONY: help install start stop clean test dev go-service node-service quarkus-service status \
 	container-build container-build-go container-build-node container-build-quarkus \
-	container-push container-push-go container-push-node container-push-quarkus
+	container-push container-push-go container-push-node container-push-quarkus \
+	container-run container-stop container-status container-logs
 
 # Configuration
 GO_PORT ?= 4001
@@ -183,5 +184,74 @@ container-push-quarkus: ## Push Quarkus service container to registry
 	@echo "$(GREEN)✓ Quarkus service container pushed$(NC)"
 
 container-push: container-push-go container-push-node container-push-quarkus ## Push all containers to registry
+
+container-run: ## Run all container images locally for testing
+	@echo "$(GREEN)Starting all containers locally...$(NC)"
+	@echo "$(YELLOW)Stopping any existing containers...$(NC)"
+	@-podman stop observability-go-api observability-node-app observability-quarkus-api 2>/dev/null || true
+	@-podman rm observability-go-api observability-node-app observability-quarkus-api 2>/dev/null || true
+	@echo "$(YELLOW)Starting Go service container...$(NC)"
+	podman run -d --name observability-go-api \
+		-p $(GO_PORT):4001 \
+		-e PORT=4001 \
+		$(REGISTRY)/observability-go-api:latest
+	@echo "$(YELLOW)Starting Quarkus service container...$(NC)"
+	podman run -d --name observability-quarkus-api \
+		-p $(QUARKUS_PORT):4003 \
+		-e PORT=4003 \
+		$(REGISTRY)/observability-quarkus-api:latest
+	@echo "$(YELLOW)Starting Node.js service container...$(NC)"
+	podman run -d --name observability-node-app \
+		-p $(NODE_PORT):4002 \
+		-e PORT=4002 \
+		-e GO_API_BASE=http://host.containers.internal:$(GO_PORT) \
+		-e QUARKUS_API_BASE=http://host.containers.internal:$(QUARKUS_PORT) \
+		$(REGISTRY)/observability-node-app:latest
+	@echo "$(GREEN)✓ All containers started$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Waiting for services to become ready...$(NC)"
+	@sleep 3
+	@make container-status
+
+container-stop: ## Stop all running containers
+	@echo "$(YELLOW)Stopping all containers...$(NC)"
+	@-podman stop observability-go-api observability-node-app observability-quarkus-api 2>/dev/null || true
+	@-podman rm observability-go-api observability-node-app observability-quarkus-api 2>/dev/null || true
+	@echo "$(GREEN)✓ All containers stopped and removed$(NC)"
+
+container-status: ## Check status of running containers
+	@echo "$(GREEN)Container Status:$(NC)"
+	@echo ""
+	@echo -n "$(YELLOW)Go Service Container:$(NC) "
+	@podman ps --filter "name=observability-go-api" --format "{{.Status}}" 2>/dev/null | grep -q "Up" && echo "$(GREEN)✓ Running$(NC)" || echo "$(RED)✗ Not running$(NC)"
+	@echo -n "$(YELLOW)Node Service Container:$(NC) "
+	@podman ps --filter "name=observability-node-app" --format "{{.Status}}" 2>/dev/null | grep -q "Up" && echo "$(GREEN)✓ Running$(NC)" || echo "$(RED)✗ Not running$(NC)"
+	@echo -n "$(YELLOW)Quarkus Service Container:$(NC) "
+	@podman ps --filter "name=observability-quarkus-api" --format "{{.Status}}" 2>/dev/null | grep -q "Up" && echo "$(GREEN)✓ Running$(NC)" || echo "$(RED)✗ Not running$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Testing service endpoints...$(NC)"
+	@echo -n "  Go API (port $(GO_PORT)):        "
+	@curl -s http://localhost:$(GO_PORT)/healthz > /dev/null 2>&1 && echo "$(GREEN)✓ Healthy$(NC)" || echo "$(RED)✗ Not responding$(NC)"
+	@echo -n "  Node Web UI (port $(NODE_PORT)):   "
+	@curl -s http://localhost:$(NODE_PORT) > /dev/null 2>&1 && echo "$(GREEN)✓ Healthy$(NC)" || echo "$(RED)✗ Not responding$(NC)"
+	@echo -n "  Quarkus API (port $(QUARKUS_PORT)):   "
+	@curl -s -X POST http://localhost:$(QUARKUS_PORT)/api/lolcat -H "Content-Type: application/json" -d '{"text":"test"}' > /dev/null 2>&1 && echo "$(GREEN)✓ Healthy$(NC)" || echo "$(RED)✗ Not responding$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Service URLs:$(NC)"
+	@echo "  Go API:        http://localhost:$(GO_PORT)"
+	@echo "  Node Web UI:   http://localhost:$(NODE_PORT)"
+	@echo "  Quarkus API:   http://localhost:$(QUARKUS_PORT)"
+
+container-logs: ## Show logs from all running containers
+	@echo "$(GREEN)Container Logs:$(NC)"
+	@echo ""
+	@echo "$(YELLOW)=== Go Service Logs ====$(NC)"
+	@podman logs --tail 20 observability-go-api 2>/dev/null || echo "$(RED)Container not running$(NC)"
+	@echo ""
+	@echo "$(YELLOW)=== Node Service Logs ====$(NC)"
+	@podman logs --tail 20 observability-node-app 2>/dev/null || echo "$(RED)Container not running$(NC)"
+	@echo ""
+	@echo "$(YELLOW)=== Quarkus Service Logs ====$(NC)"
+	@podman logs --tail 20 observability-quarkus-api 2>/dev/null || echo "$(RED)Container not running$(NC)"
 
 .DEFAULT_GOAL := help
