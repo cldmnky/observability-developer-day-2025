@@ -1,9 +1,46 @@
 # OpenShift Observability Demo Guide
 
 **Session:** Seamless tracing, metrics, and logs without touching a single line of code  
-**Presenters:** Roger Florén, Magnus Bengtsson
+**Presenters:** Roger Florén, Magnus Bengtsson  
+**Duration:** 10-12 minutes
 
 This demo showcases OpenShift's auto-instrumentation capabilities using OpenTelemetry, Tempo, and the Cluster Observability Operator (COO) to achieve full-stack observability without modifying application code.
+
+---
+
+## 🚀 Quick Start
+
+### Before the Demo (Pre-requisites)
+
+Run the preparation script to install operators and observability stacks:
+
+```bash
+./demo-prep.sh
+```
+
+This installs (takes ~5-10 minutes):
+- Cluster Observability Operator (COO)
+- Tempo Operator
+- OpenTelemetry Operator
+- MonitoringStack (Prometheus + Thanos)
+- TempoStack (Tempo with MinIO storage)
+- OpenShift Console UI Plugins
+
+### Demo Execution
+
+Run the interactive demo script:
+
+```bash
+./demo.sh
+```
+
+### After the Demo
+
+Clean up demo resources (keeps operators and stacks):
+
+```bash
+./demo-cleanup.sh
+```
 
 ---
 
@@ -11,8 +48,7 @@ This demo showcases OpenShift's auto-instrumentation capabilities using OpenTele
 
 - [Overview](#overview)
 - [Architecture Diagrams](#architecture-diagrams)
-- [Prerequisites (Pre-Demo Setup)](#prerequisites-pre-demo-setup)
-- [Demo Flow](#demo-flow)
+- [Demo Flow (10-12 minutes)](#demo-flow-10-12-minutes)
 - [Detailed Steps](#detailed-steps)
 - [Verification & Troubleshooting](#verification--troubleshooting)
 - [Key Talking Points](#key-talking-points)
@@ -313,7 +349,7 @@ oc apply -f manifests/2-observability-stack/tempo-operatorgroup.yaml
 oc apply -f manifests/2-observability-stack/tempo-subscription.yaml
 
 # OpenTelemetry Operator
-oc apply -f manifests/3-opentelemetry/subscription.yaml
+oc apply -f manifests/4-opentelemetry/subscription.yaml
 
 # Wait for operators to be ready
 oc wait --for=condition=Available csv -n openshift-cluster-observability-operator \
@@ -383,32 +419,35 @@ make container-build-node && make container-push-node
 
 ---
 
-## Demo Flow
+## Demo Flow (10-12 minutes)
 
-### Phase 1: Deploy Applications (5 minutes)
-1. Show the application architecture
-2. Deploy all 4 microservices
-3. Access the web UI and demonstrate functionality
-4. Show that applications have **no** instrumentation code
+The demo is divided into 4 phases, all automated via `./demo.sh`:
 
-### Phase 2: Enable Metrics Collection (5 minutes)
-1. Deploy ServiceMonitors for each service
-2. Show Prometheus discovering targets
-3. Query application metrics in Prometheus
-4. Demonstrate built-in Prometheus metrics (no custom code needed)
+### Phase 1: Deploy Applications (2 minutes)
 
-### Phase 3: Enable Distributed Tracing (10 minutes)
-1. Deploy OpenTelemetry RBAC and collectors
-2. Enable auto-instrumentation via pod annotations
-3. Inject sidecar collectors
-4. Restart applications to apply instrumentation
-5. Show traces flowing through the system
+- Deploy 4 microservices (Go, Python, Quarkus, Node.js)
+- Access web UI and demonstrate functionality
+- **Prove zero instrumentation code** in applications
 
-### Phase 4: Visualize & Query (5 minutes)
-1. View traces in Jaeger UI (via Tempo)
-2. Show RED metrics auto-generated from traces
-3. Demonstrate trace-to-metric correlation (exemplars)
-4. Access OpenShift Console observability features
+### Phase 2: Enable Metrics Collection (2 minutes)
+
+- Deploy ServiceMonitors with label selectors
+- Verify Prometheus is scraping targets
+- Query built-in framework metrics
+
+### Phase 3: Enable Distributed Tracing (4 minutes)
+
+- Deploy OpenTelemetry collectors (central + sidecar)
+- Deploy auto-instrumentation configuration
+- **Add 2 annotations** to each deployment (only change!)
+- Verify sidecars and instrumentation are injected
+
+### Phase 4: Visualize & Query (2-4 minutes)
+
+- View distributed traces in Jaeger UI
+- Query RED metrics auto-generated from traces
+- Show Perses dashboard in OpenShift Console
+- Demonstrate trace-to-metric correlation
 
 ---
 
@@ -547,8 +586,8 @@ process_resident_memory_bytes{job=~".*-api|node-app"}
 
 ```bash
 # Create service accounts and permissions
-oc apply -f manifests/3-opentelemetry/rbac.yaml
-oc apply -f manifests/3-opentelemetry/tempo-writer-rbac.yaml
+oc apply -f manifests/4-opentelemetry/rbac.yaml
+oc apply -f manifests/4-opentelemetry/tempo-writer-rbac.yaml
 
 # Verify service accounts
 oc get sa -n observability-demo | grep otel
@@ -564,7 +603,7 @@ oc get sa -n observability-demo | grep otel
 
 ```bash
 # Deploy Instrumentation CR
-oc apply -f manifests/3-opentelemetry/instrumentation.yaml
+oc apply -f manifests/4-opentelemetry/instrumentation.yaml
 
 # View the configuration
 oc get instrumentation demo-instrumentation -n observability-demo -o yaml
@@ -580,7 +619,7 @@ oc get instrumentation demo-instrumentation -n observability-demo -o yaml
 
 ```bash
 # Deploy sidecar collector definition
-oc apply -f manifests/3-opentelemetry/sidecar-collector.yaml
+oc apply -f manifests/4-opentelemetry/sidecar-collector.yaml
 
 # Verify OpenTelemetryCollector CR
 oc get opentelemetrycollector sidecar -n observability-demo
@@ -596,7 +635,7 @@ oc get opentelemetrycollector sidecar -n observability-demo
 
 ```bash
 # Deploy central collector
-oc apply -f manifests/3-opentelemetry/central-collector.yaml
+oc apply -f manifests/4-opentelemetry/central-collector.yaml
 
 # Wait for central collector to be ready
 oc wait --for=condition=Ready pods -l app.kubernetes.io/name=central-collector \
