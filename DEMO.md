@@ -120,28 +120,28 @@ A multi-service microservices application consisting of:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                      APPLICATION PODS (observability-demo)                   │
-│                                                                               │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
-│  │   go-api    │  │ python-api  │  │ quarkus-api │  │  node-app   │        │
-│  │             │  │             │  │             │  │             │        │
-│  │  [app code] │  │  [app code] │  │  [app code] │  │  [app code] │        │
-│  │      ↓      │  │      ↓      │  │      ↓      │  │      ↓      │        │
-│  │ Auto-Instr  │  │ Auto-Instr  │  │ Auto-Instr  │  │ Auto-Instr  │        │
-│  │   (init)    │  │   (init)    │  │   (init)    │  │   (init)    │        │
-│  │      ↓      │  │      ↓      │  │      ↓      │  │      ↓      │        │
-│  │   OTLP →    │  │   OTLP →    │  │   OTLP →    │  │   OTLP →    │        │
-│  │  localhost  │  │  localhost  │  │  localhost  │  │  localhost  │        │
-│  │    :4318    │  │    :4318    │  │    :4318    │  │    :4318    │        │
-│  │      ↓      │  │      ↓      │  │      ↓      │  │      ↓      │        │
-│  │  [Sidecar]  │  │  [Sidecar]  │  │  [Sidecar]  │  │  [Sidecar]  │        │
-│  │  Collector  │  │  Collector  │  │  Collector  │  │  Collector  │        │
-│  │  :4317/:18  │  │  :4317/:18  │  │  :4317/:18  │  │  :4317/:18  │        │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘        │
+│                      APPLICATION PODS (observability-demo)                  │
+│                                                                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │   go-api    │  │ python-api  │  │ quarkus-api │  │  node-app   │         │
+│  │             │  │             │  │             │  │             │         │
+│  │  [app code] │  │  [app code] │  │  [app code] │  │  [app code] │         │
+│  │      ↓      │  │      ↓      │  │      ↓      │  │      ↓      │         │
+│  │ Auto-Instr  │  │ Auto-Instr  │  │ Auto-Instr  │  │ Auto-Instr  │         │
+│  │   (init)    │  │   (init)    │  │   (init)    │  │   (init)    │         │
+│  │      ↓      │  │      ↓      │  │      ↓      │  │      ↓      │         │
+│  │   OTLP →    │  │   OTLP →    │  │   OTLP →    │  │   OTLP →    │         │
+│  │  localhost  │  │  localhost  │  │  localhost  │  │  localhost  │         │
+│  │    :4318    │  │    :4318    │  │    :4318    │  │    :4318    │         │
+│  │      ↓      │  │      ↓      │  │      ↓      │  │      ↓      │         │
+│  │  [Sidecar]  │  │  [Sidecar]  │  │  [Sidecar]  │  │  [Sidecar]  │         │
+│  │  Collector  │  │  Collector  │  │  Collector  │  │  Collector  │         │
+│  │  :4317/:18  │  │  :4317/:18  │  │  :4317/:18  │  │  :4317/:18  │         │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘         │
 │         │                │                │                │                │
 │         └────────────────┴────────────────┴────────────────┘                │
-│                                  │                                           │
-│                                  ▼                                           │
+│                                  │                                          │
+│                                  ▼                                          │
 │                    ┌──────────────────────────────┐                         │
 │                    │   Central Collector          │                         │
 │                    │   (Deployment, 2 replicas)   │                         │
@@ -159,28 +159,28 @@ A multi-service microservices application consisting of:
 │                    │   • Traces → Tempo           │                         │
 │                    │   • Metrics → Prometheus     │                         │
 │                    └───────┬──────────────┬───────┘                         │
-│                            │              │                                  │
-└────────────────────────────┼──────────────┼──────────────────────────────────┘
+│                            │              │                                 │
+└────────────────────────────┼──────────────┼─────────────────────────────────┘
                              │              │
             ┌────────────────┘              └──────────────────┐
             ▼                                                  ▼
 ┌───────────────────────────┐                  ┌─────────────────────────────┐
 │  openshift-tempo-operator │                  │   observability-demo        │
 │                           │                  │                             │
-│  ┌─────────────────────┐ │                  │  ┌───────────────────────┐  │
-│  │    TempoStack       │ │                  │  │   MonitoringStack     │  │
-│  │                     │ │                  │  │                       │  │
-│  │  • Distributor      │ │                  │  │  • Prometheus (x3)    │  │
-│  │  • Ingester         │ │                  │  │  • Alertmanager (x2)  │  │
-│  │  • Querier          │ │                  │  │  • Thanos Querier     │  │
-│  │  • Query Frontend   │ │                  │  │                       │  │
-│  │                     │ │                  │  │  ServiceMonitors:     │  │
-│  │  Storage: MinIO S3  │ │                  │  │   • go-api           │  │
-│  │  Retention: 48h     │ │                  │  │   • python-api       │  │
-│  │  Tenants: dev,prod  │ │                  │  │   • quarkus-api      │  │
-│  │                     │ │                  │  │   • node-app         │  │
-│  │  Jaeger UI: ✓       │ │                  │  │   • central-collector│  │
-│  └─────────────────────┘ │                  │  └───────────────────────┘  │
+│  ┌─────────────────────┐  │                  │  ┌───────────────────────┐  │
+│  │    TempoStack       │  │                  │  │   MonitoringStack     │  │
+│  │                     │  │                  │  │                       │  │
+│  │  • Distributor      │  │                  │  │  • Prometheus (x3)    │  │
+│  │  • Ingester         │  │                  │  │  • Alertmanager (x2)  │  │
+│  │  • Querier          │  │                  │  │  • Thanos Querier     │  │
+│  │  • Query Frontend   │  │                  │  │                       │  │
+│  │                     │  │                  │  │  ServiceMonitors:     │  │
+│  │  Storage: MinIO S3  │  │                  │  │   • go-api            |  │
+│  │  Retention: 48h     │  │                  │  │   • python-api        │  │
+│  │  Tenants: dev,prod  │  │                  │  │   • quarkus-api       │  │
+│  │                     │  │                  │  │   • node-app          │  │
+│  │  Jaeger UI: ✓       │  │                  │  │   • central-collector │  │
+│  └─────────────────────┘  │                  │  └───────────────────────┘  │
 └───────────────────────────┘                  └─────────────────────────────┘
             │                                                  │
             ▼                                                  ▼
@@ -199,17 +199,17 @@ User Request
     │
     ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ Node.js App Pod                                                  │
-│                                                                   │
-│  HTTP Request                                                    │
-│       ↓                                                          │
+│ Node.js App Pod                                                 │
+│                                                                 │
+│  HTTP Request                                                   │
+│       ↓                                                         │
 │  ┌────────────────────────────────────────┐                     │
 │  │ Auto-Instrumentation (init container)  │                     │
 │  │ • Injects OpenTelemetry SDK            │                     │
 │  │ • Sets OTEL_* env vars                 │                     │
 │  │ • Configures OTLP endpoint             │                     │
 │  └────────────────────────────────────────┘                     │
-│       ↓                                                          │
+│       ↓                                                         │
 │  ┌────────────────────────────────────────┐                     │
 │  │ Express.js App (instrumented)          │                     │
 │  │ • Automatic span creation              │                     │
@@ -223,35 +223,35 @@ User Request
 │  │ • Adds K8s metadata                    │                     │
 │  │ • Forwards to central                  │                     │
 │  └────────────────────────────────────────┘                     │
-│       ↓                                                          │
-└───────┼──────────────────────────────────────────────────────────┘
+│       ↓                                                         │
+└───────┼─────────────────────────────────────────────────────────┘
         │
         │ (calls Python API)
         ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ Python API Pod                                                   │
-│                                                                   │
+│ Python API Pod                                                  │
+│                                                                 │
 │  HTTP Request (with trace context in headers)                   │
-│       ↓                                                          │
+│       ↓                                                         │
 │  ┌────────────────────────────────────────┐                     │
 │  │ Auto-Instrumentation                   │                     │
 │  │ • Python OpenTelemetry agent           │                     │
 │  │ • Extracts parent trace context        │                     │
 │  │ • Creates child span                   │                     │
 │  └────────────────────────────────────────┘                     │
-│       ↓                                                          │
+│       ↓                                                         │
 │  ┌────────────────────────────────────────┐                     │
 │  │ FastAPI App (instrumented)             │                     │
 │  │ • GET /api/seed                        │                     │
-│  │ • Random delay (0.1s - 5s)            │                     │
+│  │ • Random delay (0.1s - 5s)             │                     │
 │  │ • Returns seed value                   │                     │
 │  └────────────────────────────────────────┘                     │
 │       ↓ (OTLP to localhost:4318)                                │
 │  ┌────────────────────────────────────────┐                     │
 │  │ Sidecar Collector                      │                     │
 │  └────────────────────────────────────────┘                     │
-│       ↓                                                          │
-└───────┼──────────────────────────────────────────────────────────┘
+│       ↓                                                         │
+└───────┼─────────────────────────────────────────────────────────┘
         │
         ▼
     [Central Collector → Tempo/Prometheus]

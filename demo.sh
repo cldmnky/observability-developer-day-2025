@@ -78,7 +78,7 @@ show_yaml() {
 
 clear
 explain "Let's do some OpenShift Observability magic 🎩 with Auto-Instrumentation! ✨"
-wait
+p ""
 clear
 
 cat << 'EOF'
@@ -243,7 +243,7 @@ clear
 step "Phase 3: Enable Distributed Tracing"
 
 explain "Here's how the observability stack architecture works:"
-echo ""
+p ""
 cat << 'EOF' | less -R
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                      APPLICATION PODS (observability-demo)                  │
@@ -411,7 +411,7 @@ clear
 step "Phase 4: Visualize & Query"
 
 explain "Let's understand the request flow with instrumentation:"
-echo ""
+p ""
 cat << 'EOF' | less -R
 User Request
     │
@@ -495,28 +495,6 @@ pei "oc apply -f manifests/5-coo-setup/working-dashboard.yaml"
 wait
 clear
 
-explain "Opening Jaeger UI to view traces..."
-echo "Port-forwarding to Tempo Query Frontend (Ctrl+C to close)..."
-echo ""
-echo "Visit: http://localhost:16686"
-echo "  1. Select service: node-app"
-echo "  2. Click 'Find Traces'"
-echo "  3. Explore distributed traces across services!"
-
-oc port-forward -n openshift-tempo-operator svc/tempo-tempo-query-frontend 16686:16686 &
-PF_PID=$!
-sleep 3
-
-echo ""
-echo -e "${GREEN}Jaeger UI: http://localhost:16686${NC}"
-open "http://localhost:16686"
-
-wait
-
-# Kill port-forward
-kill $PF_PID 2>/dev/null || true
-clear
-
 explain "Checking RED metrics auto-generated from traces..."
 echo "Opening Prometheus..."
 oc port-forward -n observability-demo svc/observability-stack-prometheus 9090:9090 &
@@ -548,7 +526,9 @@ echo ""
 echo "Navigate to:"
 echo "  • Observe → Metrics (Perses dashboard)"
 echo "  • Observe → Traces (Distributed Tracing UI)"
-
+p ""
+open "$CONSOLE/observe/traces"
+clear
 wait
 
 # ==========================================
