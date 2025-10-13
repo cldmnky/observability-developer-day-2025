@@ -17,13 +17,17 @@ spec:
     secret:
       name: tempostack-dev-minio
       type: s3
+    tls:
+      enabled: true
+      # Skip certificate verification for self-signed certs
+      insecureSkipVerify: true
   
   # Resource limits
   resources:
     total:
       limits:
-        cpu: "2"
-        memory: 2Gi
+        cpu: "4"
+        memory: 4Gi
   
   # Trace retention
   retention:
@@ -66,7 +70,9 @@ spec:
       enabled: true
       component: {}
       ingress:
-        route: {}
+        route:
+          termination: edge
+        type: route
   
   # Multi-tenancy configuration
   tenants:
