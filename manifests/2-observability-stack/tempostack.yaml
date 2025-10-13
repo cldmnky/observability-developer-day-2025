@@ -1,0 +1,78 @@
+---
+apiVersion: tempo.grafana.com/v1alpha1
+kind: TempoStack
+metadata:
+  name: tempo
+  namespace: openshift-tempo-operator
+  labels:
+    app.kubernetes.io/managed-by: tempo-operator
+    tempo.grafana.com/distribution: openshift
+spec:
+  managementState: Managed
+  replicationFactor: 1
+  storageSize: 1Gi
+  
+  # S3-compatible storage configuration
+  storage:
+    secret:
+      name: tempostack-dev-minio
+      type: s3
+  
+  # Resource limits
+  resources:
+    total:
+      limits:
+        cpu: "2"
+        memory: 2Gi
+  
+  # Trace retention
+  retention:
+    global:
+      traces: 48h0m0s
+  
+  # Query limits
+  limits:
+    global:
+      ingestion: {}
+      query:
+        maxSearchDuration: 0s
+  
+  # Search configuration
+  search:
+    defaultResultLimit: 20
+    maxDuration: 0s
+  
+  # Observability (internal metrics and tracing)
+  observability:
+    metrics: {}
+    tracing:
+      jaeger_agent_endpoint: localhost:6831
+  
+  # Service account
+  serviceAccount: tempo-tempo
+  
+  # Component configuration
+  template:
+    distributor:
+      replicas: 1
+    ingester:
+      replicas: 1
+    compactor: {}
+    querier: {}
+    queryFrontend:
+      jaegerQuery:
+        enabled: true
+    gateway:
+      enabled: true
+      component: {}
+      ingress:
+        route: {}
+  
+  # Multi-tenancy configuration
+  tenants:
+    mode: openshift
+    authentication:
+      - tenantName: dev
+        tenantId: "1610b0c3-c509-4592-a256-a1871353dbfa"
+      - tenantName: prod
+        tenantId: "6094b0f1-711d-4395-82c0-30c2720c6648"

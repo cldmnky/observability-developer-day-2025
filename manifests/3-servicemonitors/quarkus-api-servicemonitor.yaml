@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: quarkus-api
+  namespace: observability-demo
+  labels:
+    monitoring.rhobs/stack: observability-stack
+    app.kubernetes.io/name: quarkus-api
+    app.kubernetes.io/component: backend
+spec:
+  selector:
+    matchLabels:
+      app: quarkus-api
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scheme: http
