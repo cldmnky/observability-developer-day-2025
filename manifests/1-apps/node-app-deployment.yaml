@@ -1,0 +1,110 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-app
+  namespace: observability-demo
+  labels:
+    app: node-app
+    app.kubernetes.io/name: node-app
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: observability-stack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: node-app
+  template:
+    metadata:
+      labels:
+        app: node-app
+        app.kubernetes.io/name: node-app
+        app.kubernetes.io/component: frontend
+        app.kubernetes.io/part-of: observability-stack
+    spec:
+      containers:
+      - name: node-app
+        image: quay.io/cldmnky/observability-node-app:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 4002
+          protocol: TCP
+          name: http
+        env:
+        - name: PORT
+          value: "4002"
+        - name: GO_API_BASE
+          value: "http://go-api:8080"
+        - name: PYTHON_API_BASE
+          value: "http://python-api:8080"
+        - name: QUARKUS_API_BASE
+          value: "http://quarkus-api:8080"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 4002
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 2
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 4002
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 2
+          successThreshold: 1
+          failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: node-app
+  namespace: observability-demo
+  labels:
+    app: node-app
+    app.kubernetes.io/name: node-app
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: observability-stack
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 4002
+    protocol: TCP
+    name: http
+  selector:
+    app: node-app
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: node-app
+  namespace: observability-demo
+  labels:
+    app: node-app
+    app.kubernetes.io/name: node-app
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: observability-stack
+spec:
+  to:
+    kind: Service
+    name: node-app
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
