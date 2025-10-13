@@ -8,7 +8,7 @@ from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST, CollectorRegistry
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST, CollectorRegistry
 
 # Create a custom registry to avoid conflicts
 metrics_registry = CollectorRegistry()
@@ -39,10 +39,49 @@ seed_generation_duration = Histogram(
     'Time spent generating seeds',
     registry=metrics_registry
 )
+request_errors_counter = Counter(
+    'seed_api_errors_total',
+    'Total number of errors in seed API',
+    ['error_type'],
+    registry=metrics_registry
+)
+response_size_histogram = Histogram(
+    'seed_api_response_size_bytes',
+    'Size of API responses in bytes',
+    registry=metrics_registry
+)
+active_requests_gauge = Gauge(
+    'seed_api_active_requests',
+    'Number of currently active requests',
+    registry=metrics_registry
+)
+seed_value_histogram = Histogram(
+    'seed_value_distribution',
+    'Distribution of generated seed values',
+    buckets=[0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000],
+    registry=metrics_registry
+)
+processing_delay_histogram = Histogram(
+    'seed_processing_delay_seconds',
+    'Simulated processing delay',
+    registry=metrics_registry
+)
 
 class SeedResponse(BaseModel):
     seed: float
     timestamp: float
+
+# Middleware to track active requests
+@app.middleware("http")
+async def track_active_requests(request, call_next):
+    if request.url.path == "/api/seed":
+        active_requests_gauge.inc()
+    try:
+        response = await call_next(request)
+        return response
+    finally:
+        if request.url.path == "/api/seed":
+            active_requests_gauge.dec()
 
 @app.get("/")
 async def root():
@@ -70,19 +109,32 @@ async def get_seed():
     """
     import time
     import asyncio
+    import json
     
     seed_requests_counter.inc()
     
-    # Add random delay to simulate processing time
-    with seed_generation_duration.time():
-        delay = random.uniform(0.1, 5.0)
-        await asyncio.sleep(delay)
-        seed = random.uniform(0.0, 1000.0)
-    
-    return SeedResponse(
-        seed=round(seed, 2),
-        timestamp=time.time()
-    )
+    try:
+        # Add random delay to simulate processing time
+        with seed_generation_duration.time():
+            delay = random.uniform(0.1, 5.0)
+            processing_delay_histogram.observe(delay)
+            await asyncio.sleep(delay)
+            seed = random.uniform(0.0, 1000.0)
+            seed_value_histogram.observe(seed)
+        
+        response = SeedResponse(
+            seed=round(seed, 2),
+            timestamp=time.time()
+        )
+        
+        # Track response size
+        response_json = json.dumps(response.dict())
+        response_size_histogram.observe(len(response_json))
+        
+        return response
+    except Exception as e:
+        request_errors_counter.labels(error_type=type(e).__name__).inc()
+        raise
 
 @app.get("/metrics")
 async def metrics():

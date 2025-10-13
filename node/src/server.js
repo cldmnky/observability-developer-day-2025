@@ -25,11 +25,21 @@ const workerRequestsTotal = new client.Counter({
   registers: [register]
 });
 
+const nameGenerationsTotal = new client.Counter({
+  name: 'node_api_name_generations_total',
+  help: 'Total number of name generation requests',
+  registers: [register]
+});
+
+const figletGenerationsTotal = new client.Counter({
+  name: 'node_api_figlet_generations_total',
+  help: 'Total number of figlet generation requests',
+  registers: [register]
+});
+
 const app = express();
 const PORT = process.env.PORT || 4002;
 const GO_API_BASE = process.env.GO_API_BASE || 'http://localhost:4001';
-const QUARKUS_API_BASE = process.env.QUARKUS_API_BASE || 'http://localhost:4003';
-const PYTHON_API_BASE = process.env.PYTHON_API_BASE || 'http://localhost:4004';
 
 // Statistics for background worker
 const stats = {
@@ -48,8 +58,8 @@ async function backgroundWorker() {
     try {
       stats.totalRequests++;
       
-      // Get seed from Python API
-      const seedResponse = await fetch(`${PYTHON_API_BASE}/api/seed`);
+      // Get seed from Go API (which internally calls Python API)
+      const seedResponse = await fetch(`${GO_API_BASE}/api/seed`);
       if (seedResponse.ok) {
         const seedData = await seedResponse.json();
         stats.lastSeed = seedData.seed;
@@ -119,6 +129,7 @@ app.get('/api/worker/stats', (req, res) => {
 
 // Proxy endpoint for Go API - Get names
 app.get('/api/name', async (req, res) => {
+  nameGenerationsTotal.inc();
   try {
     const queryParams = new URLSearchParams(req.query);
     const response = await fetch(`${GO_API_BASE}/api/name?${queryParams.toString()}`);
@@ -144,8 +155,12 @@ app.get('/api/name', async (req, res) => {
 
 // Proxy endpoint for Go API - Figlet
 app.post('/api/figlet', async (req, res) => {
+  figletGenerationsTotal.inc();
   try {
-    const response = await fetch(`${GO_API_BASE}/api/figlet`, {
+    const useLolcat = req.query.lolcat === 'true' || req.body.useLolcat === true;
+    const queryParams = useLolcat ? '?lolcat=true' : '';
+    
+    const response = await fetch(`${GO_API_BASE}/api/figlet${queryParams}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req.body)
@@ -170,57 +185,7 @@ app.post('/api/figlet', async (req, res) => {
   }
 });
 
-// Proxy endpoint for Python API - Get seed
-app.get('/api/seed', async (req, res) => {
-  try {
-    const response = await fetch(`${PYTHON_API_BASE}/api/seed`);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      return res.status(response.status).json({ 
-        error: 'Failed to fetch seed from Python API',
-        details: errorText 
-      });
-    }
-    
-    const data = await response.json();
-    res.json(data);
-  } catch (error) {
-    console.error('Error proxying to Python API:', error);
-    res.status(500).json({ 
-      error: 'Failed to connect to Python API',
-      message: error.message 
-    });
-  }
-});
 
-// Proxy endpoint for Quarkus API - Lolcat
-app.post('/api/lolcat', async (req, res) => {
-  try {
-    const response = await fetch(`${QUARKUS_API_BASE}/api/lolcat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body)
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      return res.status(response.status).json({ 
-        error: 'Failed to colorize with Quarkus API',
-        details: errorText 
-      });
-    }
-    
-    const data = await response.json();
-    res.json(data);
-  } catch (error) {
-    console.error('Error proxying to Quarkus API:', error);
-    res.status(500).json({ 
-      error: 'Failed to connect to Quarkus API',
-      message: error.message 
-    });
-  }
-});
 
 app.listen(PORT, () => {
   console.log(`
@@ -232,8 +197,7 @@ app.listen(PORT, () => {
 ║                                                           ║
 ║   Proxying to:                                           ║
 ║   - Go API:      ${GO_API_BASE}                    ║
-║   - Quarkus API: ${QUARKUS_API_BASE}                    ║
-║   - Python API:  ${PYTHON_API_BASE}                    ║
+║     (Go API orchestrates Python & Quarkus services)      ║
 ║                                                           ║
 ║   Background worker: ACTIVE                              ║
 ║   Stats endpoint: /api/worker/stats                      ║
