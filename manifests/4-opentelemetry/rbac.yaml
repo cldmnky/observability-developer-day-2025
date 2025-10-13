@@ -11,7 +11,7 @@ rules:
     resources: ["replicasets"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["config.openshift.io"]
-    resources: ["infrastructures"]
+    resources: ["infrastructures", "infrastructures/status"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["tempo.grafana.com"]
     resources: ["traces"]

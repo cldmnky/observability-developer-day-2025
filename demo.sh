@@ -180,7 +180,8 @@ run_cmd "oc apply -f manifests/4-opentelemetry/central-collector.yaml"
 
 echo ""
 explain "Waiting for central collector to be ready..."
-run_cmd "oc wait --for=condition=Ready pods -l app.kubernetes.io/name=central-collector -n observability-demo --timeout=120s"
+sleep 5
+run_cmd "oc wait --for=condition=Ready pods -l app.kubernetes.io/component=opentelemetry-collector -n observability-demo --timeout=120s || echo 'Note: Collector pods may take a moment to appear'"
 
 pause
 
