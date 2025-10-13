@@ -3,15 +3,22 @@ package api
 import (
 	"encoding/json"
 	"hash/fnv"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	figure "github.com/common-nighthawk/go-figure"
 
 	"github.com/cldmnky/observability-developer-day-2025/go/data"
 	"github.com/cldmnky/observability-developer-day-2025/go/pkg/namer"
 )
+
+func init() {
+	// Initialize random seed for error generation
+	rand.Seed(time.Now().UnixNano())
+}
 
 type NameGenerator interface {
 	Name() namer.Name
@@ -85,6 +92,12 @@ type figletResponse struct {
 func (s *Server) handleName(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Simulate random failures (~5% of requests) for observability testing
+	if rand.Float64() < 0.05 {
+		http.Error(w, "internal service error: temporary name generation failure", http.StatusInternalServerError)
 		return
 	}
 
