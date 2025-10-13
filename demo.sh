@@ -3,7 +3,10 @@
 # This script walks through the demo steps with pauses and explanations
 # Estimated time: 10-12 minutes
 
-set -e
+########################
+# include the magic
+########################
+. scripts/demo-magic.sh
 
 # Colors
 GREEN='\033[0;32m'
@@ -12,15 +15,9 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-# Function to pause and wait for user
-pause() {
-    echo ""
-    echo -e "${CYAN}Press ENTER to continue...${NC}"
-    read -r
-}
-
 # Function to show step header
 step() {
+    clear
     echo ""
     echo "========================================="
     echo -e "${BLUE}$1${NC}"
@@ -34,23 +31,44 @@ if command -v redhatsay &> /dev/null; then
     HAS_REDHATSAY=true
 fi
 
+# Check if gum is available
+HAS_GUM=false
+if command -v gum &> /dev/null; then
+    HAS_GUM=true
+fi
+
 # Function to explain what we're doing
 explain() {
     if [ "$HAS_REDHATSAY" = true ]; then
-        redhatsay "📝 $1"
+        redhatsay "$1"
     else
-        echo -e "${YELLOW}📝 $1${NC}"
+        echo -e "${YELLOW}$1${NC}"
     fi
     echo ""
 }
 
-# Function to run command with explanation
-run_cmd() {
-    echo -e "${GREEN}$ $1${NC}"
-    eval "$1"
+# Function to show YAML with syntax highlighting
+show_yaml() {
+    local file=$1
+    local description=$2
+    
+    if [ -n "$description" ]; then
+        explain "$description"
+    fi
+    
+    if [ "$HAS_GUM" = true ]; then
+        cat "$file" | gum format -t code -l yaml
+    else
+        cat "$file"
+    fi
+    wait
 }
 
 clear
+explain "Let's do some OpenShift Observability magic 🎩 with Auto-Instrumentation! ✨"
+wait
+clear
+
 echo "========================================="
 echo "  OpenShift Observability Demo"
 echo "  Auto-Instrumentation in Action"
@@ -63,7 +81,7 @@ echo "  3. Enable Distributed Tracing (4 min)"
 echo "  4. Visualize & Query (2-4 min)"
 echo ""
 
-pause
+wait
 
 # ==========================================
 # PHASE 1: DEPLOY APPLICATIONS
@@ -79,25 +97,28 @@ echo "  • Node.js App (port 3000) - Web frontend + background worker"
 echo ""
 explain "⚡ Key point: NO OpenTelemetry code in any of these apps!"
 
-pause
+wait
+
+explain "Let's look at one of the deployments first..."
+show_yaml "manifests/1-apps/python-api-deployment.yaml" "📄 Python API Deployment - Notice: No instrumentation annotations yet!"
 
 explain "Deploying all 4 applications..."
-run_cmd "oc apply -f manifests/1-apps/"
+pei "oc apply -f manifests/1-apps/"
 
 echo ""
 explain "Waiting for demo app pods to be ready..."
-run_cmd "oc wait --for=condition=Ready pods -l demo=observability -n observability-demo --timeout=120s"
+pei "oc wait --for=condition=Ready pods -l demo=observability -n observability-demo --timeout=120s"
 
 echo ""
-run_cmd "oc get pods -l demo=observability -n observability-demo"
+pei "oc get pods -l demo=observability -n observability-demo"
 
-pause
+wait
 
 explain "Let's prove there's no instrumentation code..."
 echo "Checking Python app for OpenTelemetry imports:"
-run_cmd "oc exec -n observability-demo deployment/python-api -- cat /app/app.py | grep -i 'otel\\|telemetry' || echo 'No OpenTelemetry code found! ✓'"
+pei "oc exec -n observability-demo deployment/python-api -- cat /app/app.py | grep -i 'otel\\|telemetry' || echo 'No OpenTelemetry code found! ✓'"
 
-pause
+wait
 
 explain "Getting the web app URL..."
 ROUTE=$(oc get route node-app -n observability-demo -o jsonpath='{.spec.host}' 2>/dev/null || echo "")
@@ -105,6 +126,8 @@ if [ -n "$ROUTE" ]; then
     echo -e "${GREEN}🌐 Web UI: https://$ROUTE${NC}"
     echo ""
     echo "👉 Open this in your browser and generate some names!"
+    wait
+    open "https://$ROUTE"
 else
     echo "Route not found, creating..."
     oc create route edge node-app --service=node-app -n observability-demo
@@ -112,7 +135,7 @@ else
     echo -e "${GREEN}🌐 Web UI: https://$ROUTE${NC}"
 fi
 
-pause
+wait
 
 # ==========================================
 # PHASE 2: ENABLE METRICS COLLECTION
@@ -124,15 +147,18 @@ explain "ServiceMonitors tell Prometheus what to scrape."
 echo "Each ServiceMonitor has the label: monitoring.rhobs/stack: observability-stack"
 echo "Prometheus discovers them via label selector."
 
-pause
+wait
+
+explain "Let's look at a ServiceMonitor definition..."
+show_yaml "manifests/3-servicemonitors/python-api-servicemonitor.yaml" "📄 ServiceMonitor - Notice the label selector and endpoint configuration"
 
 explain "Deploying ServiceMonitors for all applications..."
-run_cmd "oc apply -f manifests/3-servicemonitors/"
+pei "oc apply -f manifests/3-servicemonitors/"
 
 echo ""
-run_cmd "oc get servicemonitors.monitoring.rhobs -n observability-demo"
+pei "oc get servicemonitors.monitoring.rhobs -n observability-demo"
 
-pause
+wait
 
 explain "Checking Prometheus targets..."
 echo "Opening port-forward to Prometheus (Ctrl+C to close)..."
@@ -151,8 +177,10 @@ echo "Try these queries:"
 echo "  • up{namespace=\"observability-demo\"}"
 echo "  • rate(http_server_duration_milliseconds_count[5m])"
 echo "  • process_resident_memory_bytes{namespace=\"observability-demo\"}"
+wait
+open "http://localhost:9090"
 
-pause
+wait
 
 # Kill port-forward
 kill $PF_PID 2>/dev/null || true
@@ -164,36 +192,42 @@ kill $PF_PID 2>/dev/null || true
 step "Phase 3: Enable Distributed Tracing"
 
 explain "Step 1: Deploy RBAC for OpenTelemetry collectors"
-run_cmd "oc apply -f manifests/4-opentelemetry/rbac.yaml"
-run_cmd "oc apply -f manifests/4-opentelemetry/tempo-writer-rbac.yaml"
+pei "oc apply -f manifests/4-opentelemetry/rbac.yaml"
+pei "oc apply -f manifests/4-opentelemetry/tempo-writer-rbac.yaml"
 
-pause
+wait
 
 explain "Step 2: Deploy auto-instrumentation configuration"
 echo "This defines how to instrument each language (Python, Node.js, Java, Go)"
-run_cmd "oc apply -f manifests/4-opentelemetry/instrumentation.yaml"
+echo ""
+show_yaml "manifests/4-opentelemetry/instrumentation.yaml" "📄 Instrumentation - Auto-inject agents for each language"
+
+pei "oc apply -f manifests/4-opentelemetry/instrumentation.yaml"
 
 echo ""
-run_cmd "oc get instrumentation -n observability-demo"
+pei "oc get instrumentation -n observability-demo"
 
-pause
+wait
 
 explain "Step 3: Deploy sidecar collector"
 echo "Runs alongside each app pod, receives OTLP from the app"
-run_cmd "oc apply -f manifests/4-opentelemetry/sidecar-collector.yaml"
+pei "oc apply -f manifests/4-opentelemetry/sidecar-collector.yaml"
 
-pause
+wait
 
 explain "Step 4: Deploy central collector"
 echo "Aggregates telemetry, generates RED metrics, exports to Tempo/Prometheus"
-run_cmd "oc apply -f manifests/4-opentelemetry/central-collector.yaml"
+echo ""
+show_yaml "manifests/4-opentelemetry/central-collector.yaml" "📄 Central Collector - Notice the spanmetrics connector for RED metrics!"
+
+pei "oc apply -f manifests/4-opentelemetry/central-collector.yaml"
 
 echo ""
 explain "Waiting for central collector to be ready..."
 sleep 5
-run_cmd "oc wait --for=condition=Ready pods -l app.kubernetes.io/component=opentelemetry-collector -n observability-demo --timeout=120s || echo 'Note: Collector pods may take a moment to appear'"
+pei "oc wait --for=condition=Ready pods -l app.kubernetes.io/component=opentelemetry-collector -n observability-demo --timeout=120s || echo 'Note: Collector pods may take a moment to appear'"
 
-pause
+wait
 
 explain "Step 5: Enable auto-instrumentation via annotations"
 echo "⚡ This is the ONLY change to the deployments!"
@@ -203,36 +237,36 @@ echo "  1. Service account: otel-collector-sidecar"
 echo "  2. Annotation: sidecar.opentelemetry.io/inject: sidecar"
 echo "  3. Annotation: instrumentation.opentelemetry.io/inject-<lang>: demo-instrumentation"
 
-pause
+wait
 
 explain "Patching go-api deployment..."
-run_cmd "oc patch deployment go-api -n observability-demo -p '{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"sidecar.opentelemetry.io/inject\":\"sidecar\"}},\"spec\":{\"serviceAccountName\":\"otel-collector-sidecar\"}}}}'"
+pei "oc patch deployment go-api -n observability-demo -p '{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"sidecar.opentelemetry.io/inject\":\"sidecar\"}},\"spec\":{\"serviceAccountName\":\"otel-collector-sidecar\"}}}}'"
 
 explain "Patching python-api deployment..."
-run_cmd "oc patch deployment python-api -n observability-demo -p '{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"sidecar.opentelemetry.io/inject\":\"sidecar\",\"instrumentation.opentelemetry.io/inject-python\":\"demo-instrumentation\"}},\"spec\":{\"serviceAccountName\":\"otel-collector-sidecar\"}}}}'"
+pei "oc patch deployment python-api -n observability-demo -p '{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"sidecar.opentelemetry.io/inject\":\"sidecar\",\"instrumentation.opentelemetry.io/inject-python\":\"demo-instrumentation\"}},\"spec\":{\"serviceAccountName\":\"otel-collector-sidecar\"}}}}'"
 
 explain "Patching quarkus-api deployment..."
-run_cmd "oc patch deployment quarkus-api -n observability-demo -p '{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"sidecar.opentelemetry.io/inject\":\"sidecar\",\"instrumentation.opentelemetry.io/inject-java\":\"demo-instrumentation\"}},\"spec\":{\"serviceAccountName\":\"otel-collector-sidecar\"}}}}'"
+pei "oc patch deployment quarkus-api -n observability-demo -p '{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"sidecar.opentelemetry.io/inject\":\"sidecar\",\"instrumentation.opentelemetry.io/inject-java\":\"demo-instrumentation\"}},\"spec\":{\"serviceAccountName\":\"otel-collector-sidecar\"}}}}'"
 
 explain "Patching node-app deployment..."
-run_cmd "oc patch deployment node-app -n observability-demo -p '{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"sidecar.opentelemetry.io/inject\":\"sidecar\",\"instrumentation.opentelemetry.io/inject-nodejs\":\"demo-instrumentation\"}},\"spec\":{\"serviceAccountName\":\"otel-collector-sidecar\"}}}}'"
+pei "oc patch deployment node-app -n observability-demo -p '{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"sidecar.opentelemetry.io/inject\":\"sidecar\",\"instrumentation.opentelemetry.io/inject-nodejs\":\"demo-instrumentation\"}},\"spec\":{\"serviceAccountName\":\"otel-collector-sidecar\"}}}}'"
 
 echo ""
 explain "Waiting for demo app pods to restart with instrumentation..."
 sleep 10
-run_cmd "oc wait --for=condition=Ready pods -l demo=observability -n observability-demo --timeout=120s"
+pei "oc wait --for=condition=Ready pods -l demo=observability -n observability-demo --timeout=120s"
 
-pause
+wait
 
 explain "Verifying instrumentation..."
 echo "Each pod should now have 2 containers: app + sidecar (otc-container)"
-run_cmd "oc get pods -l demo=observability -n observability-demo"
+pei "oc get pods -l demo=observability -n observability-demo"
 
 echo ""
 echo "Checking OTEL environment variables in python-api:"
-run_cmd "oc exec -n observability-demo deployment/python-api -c python-api -- env | grep OTEL_ | head -5"
+pei "oc exec -n observability-demo deployment/python-api -c python-api -- env | grep OTEL_ | head -5"
 
-pause
+wait
 
 # ==========================================
 # PHASE 4: VISUALIZE & QUERY
@@ -240,11 +274,14 @@ pause
 
 step "Phase 4: Visualize & Query"
 
-explain "Deploying Perses datasource and dashboard..."
-run_cmd "oc apply -f manifests/5-coo-setup/perses-datasource.yaml"
-run_cmd "oc apply -f manifests/5-coo-setup/working-dashboard.yaml"
+explain "Let's look at the Perses dashboard configuration..."
+show_yaml "manifests/5-coo-setup/working-dashboard.yaml" "📄 Perses Dashboard - Notice the panels for RED metrics and application metrics"
 
-pause
+explain "Deploying Perses datasource and dashboard..."
+pei "oc apply -f manifests/5-coo-setup/perses-datasource.yaml"
+pei "oc apply -f manifests/5-coo-setup/working-dashboard.yaml"
+
+wait
 
 explain "Opening Jaeger UI to view traces..."
 echo "Port-forwarding to Tempo Query Frontend (Ctrl+C to close)..."
@@ -260,8 +297,9 @@ sleep 3
 
 echo ""
 echo -e "${GREEN}Jaeger UI: http://localhost:16686${NC}"
+open "http://localhost:16686"
 
-pause
+wait
 
 # Kill port-forward
 kill $PF_PID 2>/dev/null || true
@@ -282,8 +320,9 @@ echo "  sum by (service_name) (rate(http_server_duration_milliseconds_count{k8s_
 echo ""
 echo "P95 latency:"
 echo "  histogram_quantile(0.95, sum by (service_name, le) (rate(http_server_duration_milliseconds_bucket{k8s_namespace_name=\"observability-demo\"}[5m])))"
+open "http://localhost:9090"
 
-pause
+wait
 
 # Kill port-forward
 kill $PF_PID 2>/dev/null || true
@@ -296,7 +335,7 @@ echo "Navigate to:"
 echo "  • Observe → Metrics (Perses dashboard)"
 echo "  • Observe → Traces (Distributed Tracing UI)"
 
-pause
+wait
 
 # ==========================================
 # DEMO COMPLETE
