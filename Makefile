@@ -163,6 +163,13 @@ start: python-check-env ## Start all services in background (requires tmux)
 stop: ## Stop all services running in tmux
 	@echo "$(YELLOW)Stopping all services...$(NC)"
 	@tmux kill-session -t observability-dev 2>/dev/null || echo "$(YELLOW)No tmux session found$(NC)"
+	@echo "$(YELLOW)Cleaning up orphaned processes...$(NC)"
+	@pkill -9 -f "quarkus:dev" 2>/dev/null || true
+	@pkill -9 -f "lolcat-service-dev.jar" 2>/dev/null || true
+	@pkill -9 -f "go/bin/api" 2>/dev/null || true
+	@pkill -9 -f "python.*app.py" 2>/dev/null || true
+	@pkill -9 -f "node.*src/server.js" 2>/dev/null || true
+	@sleep 1
 	@echo "$(GREEN)✓ All services stopped$(NC)"
 
 status: ## Check the status of all services
