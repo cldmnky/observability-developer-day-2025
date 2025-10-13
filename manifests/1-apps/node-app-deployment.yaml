@@ -36,10 +36,6 @@ spec:
           value: "4002"
         - name: GO_API_BASE
           value: "http://go-api:8080"
-        - name: PYTHON_API_BASE
-          value: "http://python-api:8080"
-        - name: QUARKUS_API_BASE
-          value: "http://quarkus-api:8080"
         resources:
           requests:
             cpu: 100m
