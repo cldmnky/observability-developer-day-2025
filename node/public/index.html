@@ -153,13 +153,15 @@
         <input type="number" id="count" min="1" max="10" value="3">
       </div>
       <div class="control-group">
-        <label>Seed (optional)</label>
-        <input type="text" id="seed" placeholder="demo-seed">
-      </div>
-      <div class="control-group">
         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 16px;">
           <input type="checkbox" id="useLolcat" style="width: auto; cursor: pointer;">
           <span>🌈 Use Lolcat Colors</span>
+        </label>
+      </div>
+      <div class="control-group">
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 16px;">
+          <input type="checkbox" id="autoRefresh" style="width: auto; cursor: pointer;">
+          <span>🔄 Auto Refresh</span>
         </label>
       </div>
       <button id="generate">Generate Names</button>
@@ -278,6 +280,21 @@
       writeLine('');
     }
     
+    async function fetchSeed() {
+      try {
+        const response = await fetch('/api/seed');
+        if (!response.ok) {
+          console.warn('Failed to fetch seed from Python API');
+          return null;
+        }
+        const { seed } = await response.json();
+        return seed;
+      } catch (error) {
+        console.warn('Error fetching seed:', error);
+        return null;
+      }
+    }
+    
     async function fetchNames(count, seed) {
       const params = new URLSearchParams();
       if (count) params.set('count', count);
@@ -309,16 +326,21 @@
     
     async function generateAndDisplay() {
       const countInput = document.getElementById('count');
-      const seedInput = document.getElementById('seed');
       const generateBtn = document.getElementById('generate');
       const useLolcat = document.getElementById('useLolcat').checked;
       
       const count = parseInt(countInput.value) || 3;
-      const seed = seedInput.value.trim() || null;
       
       generateBtn.disabled = true;
       
       try {
+        writeLine('⏳ Fetching seed from Python API...', '33'); // yellow
+        const seed = await fetchSeed();
+        
+        if (seed !== null) {
+          writeLine(`✓ Received seed: ${seed}`, '32'); // green
+        }
+        
         writeLine('⏳ Fetching names...', '33'); // yellow
         const names = await fetchNames(count, seed);
         
@@ -380,6 +402,32 @@
       }
     }
     
+    // Auto-refresh functionality
+    let autoRefreshInterval = null;
+    
+    function startAutoRefresh() {
+      if (autoRefreshInterval) return;
+      
+      writeLine('🔄 Auto-refresh enabled - generating names every 3 seconds', '32');
+      writeLine('');
+      
+      autoRefreshInterval = setInterval(() => {
+        generateAndDisplay();
+      }, 3000);
+      
+      // Generate immediately
+      generateAndDisplay();
+    }
+    
+    function stopAutoRefresh() {
+      if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+        writeLine('⏸️  Auto-refresh disabled', '33');
+        writeLine('');
+      }
+    }
+    
     // Event handlers
     document.getElementById('generate').addEventListener('click', generateAndDisplay);
     document.getElementById('clear').addEventListener('click', () => {
@@ -387,17 +435,22 @@
       writeHeader();
     });
     
-    document.getElementById('count').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') generateAndDisplay();
+    document.getElementById('autoRefresh').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        startAutoRefresh();
+      } else {
+        stopAutoRefresh();
+      }
     });
     
-    document.getElementById('seed').addEventListener('keypress', (e) => {
+    document.getElementById('count').addEventListener('keypress', (e) => {
       if (e.key === 'Enter') generateAndDisplay();
     });
     
     // Initial header
     writeHeader();
-    writeLine('Click "Generate Names" to start, or press Enter in any input field', '2'); // dim
+    writeLine('Click "Generate Names" to start, or enable Auto Refresh for continuous generation', '2'); // dim
+    writeLine('Seeds are automatically fetched from the Python API', '2');
     writeLine('');
   </script>
 </body>
