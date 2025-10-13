@@ -52,16 +52,17 @@ show_yaml() {
     local file=$1
     local description=$2
     
+    clear
     if [ -n "$description" ]; then
         explain "$description"
     fi
     
     if [ "$HAS_GUM" = true ]; then
-        cat "$file" | gum format -t code -l yaml
+        cat "$file" | gum format -t code -l yaml | less -R
     else
-        cat "$file"
+        cat "$file" | less -R
     fi
-    wait
+    clear
 }
 
 clear
@@ -113,12 +114,14 @@ echo ""
 pei "oc get pods -l demo=observability -n observability-demo"
 
 wait
+clear
 
 explain "Let's prove there's no instrumentation code..."
 echo "Checking Python app for OpenTelemetry imports:"
 pei "oc exec -n observability-demo deployment/python-api -- cat /app/app.py | grep -i 'otel\\|telemetry' || echo 'No OpenTelemetry code found! ✓'"
 
 wait
+clear
 
 explain "Getting the web app URL..."
 ROUTE=$(oc get route node-app -n observability-demo -o jsonpath='{.spec.host}' 2>/dev/null || echo "")
@@ -159,6 +162,7 @@ echo ""
 pei "oc get servicemonitors.monitoring.rhobs -n observability-demo"
 
 wait
+clear
 
 explain "Checking Prometheus targets..."
 echo "Opening port-forward to Prometheus (Ctrl+C to close)..."
@@ -184,6 +188,7 @@ wait
 
 # Kill port-forward
 kill $PF_PID 2>/dev/null || true
+clear
 
 # ==========================================
 # PHASE 3: ENABLE DISTRIBUTED TRACING  
@@ -196,6 +201,7 @@ pei "oc apply -f manifests/4-opentelemetry/rbac.yaml"
 pei "oc apply -f manifests/4-opentelemetry/tempo-writer-rbac.yaml"
 
 wait
+clear
 
 explain "Step 2: Deploy auto-instrumentation configuration"
 echo "This defines how to instrument each language (Python, Node.js, Java, Go)"
@@ -208,12 +214,14 @@ echo ""
 pei "oc get instrumentation -n observability-demo"
 
 wait
+clear
 
 explain "Step 3: Deploy sidecar collector"
 echo "Runs alongside each app pod, receives OTLP from the app"
 pei "oc apply -f manifests/4-opentelemetry/sidecar-collector.yaml"
 
 wait
+clear
 
 explain "Step 4: Deploy central collector"
 echo "Aggregates telemetry, generates RED metrics, exports to Tempo/Prometheus"
@@ -228,6 +236,7 @@ sleep 5
 pei "oc wait --for=condition=Ready pods -l app.kubernetes.io/component=opentelemetry-collector -n observability-demo --timeout=120s || echo 'Note: Collector pods may take a moment to appear'"
 
 wait
+clear
 
 explain "Step 5: Enable auto-instrumentation via annotations"
 echo "⚡ This is the ONLY change to the deployments!"
@@ -257,6 +266,7 @@ sleep 10
 pei "oc wait --for=condition=Ready pods -l demo=observability -n observability-demo --timeout=120s"
 
 wait
+clear
 
 explain "Verifying instrumentation..."
 echo "Each pod should now have 2 containers: app + sidecar (otc-container)"
@@ -267,6 +277,7 @@ echo "Checking OTEL environment variables in python-api:"
 pei "oc exec -n observability-demo deployment/python-api -c python-api -- env | grep OTEL_ | head -5"
 
 wait
+clear
 
 # ==========================================
 # PHASE 4: VISUALIZE & QUERY
@@ -282,6 +293,7 @@ pei "oc apply -f manifests/5-coo-setup/perses-datasource.yaml"
 pei "oc apply -f manifests/5-coo-setup/working-dashboard.yaml"
 
 wait
+clear
 
 explain "Opening Jaeger UI to view traces..."
 echo "Port-forwarding to Tempo Query Frontend (Ctrl+C to close)..."
@@ -303,6 +315,7 @@ wait
 
 # Kill port-forward
 kill $PF_PID 2>/dev/null || true
+clear
 
 explain "Checking RED metrics auto-generated from traces..."
 echo "Opening Prometheus..."
@@ -326,6 +339,7 @@ wait
 
 # Kill port-forward
 kill $PF_PID 2>/dev/null || true
+clear
 
 explain "Opening OpenShift Console..."
 CONSOLE=$(oc whoami --show-console)
