@@ -1,0 +1,42 @@
+---
+apiVersion: monitoring.rhobs/v1alpha1
+kind: MonitoringStack
+metadata:
+  name: observability-stack
+  namespace: observability-demo
+spec:
+  # Used to select ServiceMonitors in the observability-demo namespace
+  resourceSelector:
+    matchLabels:
+      monitoring.rhobs/stack: observability-stack
+
+  logLevel: debug
+  retention: 1d
+
+  prometheusConfig:
+    replicas: 1
+    enableRemoteWriteReceiver: true
+    externalLabels:
+      cluster: observability-demo
+      environment: dev
+
+  alertmanagerConfig:
+    disabled: false
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+---
+apiVersion: monitoring.rhobs/v1alpha1
+kind: ThanosQuerier
+metadata:
+  name: observability-stack
+  namespace: observability-demo
+spec:
+  selector:
+    matchLabels:
+      monitoring.rhobs/stack: observability-stack

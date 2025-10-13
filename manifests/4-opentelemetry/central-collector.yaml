@@ -1,0 +1,127 @@
+---
+# Central OpenTelemetry Collector - receives from sidecars, sends to backends
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: central
+  namespace: observability-demo
+spec:
+  mode: deployment
+  serviceAccount: otel-central-collector
+  replicas: 2
+  config:
+    extensions:
+      bearertokenauth:
+        filename: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+    
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    
+    connectors:
+      # Generate metrics from trace spans
+      spanmetrics:
+        namespace: span.metrics
+        histogram:
+          explicit:
+            buckets: [100us, 1ms, 2ms, 6ms, 10ms, 100ms, 250ms, 1s, 5s]
+        dimensions:
+          - name: http.method
+            default: GET
+          - name: http.status_code
+        exemplars:
+          enabled: true
+        dimensions_cache_size: 1500
+        aggregation_temporality: "AGGREGATION_TEMPORALITY_CUMULATIVE"
+        metrics_flush_interval: 30s
+    
+    processors:
+      batch:
+        send_batch_size: 1000
+        timeout: 5s
+      
+      memory_limiter:
+        check_interval: 2s
+        limit_mib: 1800
+        spike_limit_mib: 500
+      
+      k8sattributes:
+        passthrough: false
+        auth_type: serviceAccount
+        extract:
+          metadata:
+            - k8s.namespace.name
+            - k8s.deployment.name
+            - k8s.pod.name
+            - k8s.pod.uid
+            - k8s.node.name
+      
+      resourcedetection:
+        detectors: [openshift]
+        timeout: 2s
+      
+      # Transform span metrics using transform processor
+      transform/spanmetrics:
+        metric_statements:
+          - context: metric
+            statements:
+              # Rename calls_total to traces_spanmetrics_calls_total
+              - replace_pattern(name, "calls_total", "traces_spanmetrics_calls_total")
+              # Rename latency to traces_spanmetrics_latency  
+              - replace_pattern(name, "latency", "traces_spanmetrics_latency")
+    
+    exporters:
+      # Export traces to Tempo gateway with GRPC, bearer token, and service CA
+      otlp/tempo:
+        endpoint: tempo-tempo-gateway.openshift-tempo-operator.svc:8090
+        tls:
+          ca_file: "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
+        auth:
+          authenticator: bearertokenauth
+        headers:
+          X-Scope-OrgID: "dev"
+      
+      # Export metrics to Prometheus (COO monitoring stack)
+      prometheusremotewrite:
+        endpoint: "http://observability-stack-prometheus.observability-demo.svc:9090/api/v1/write"
+        tls:
+          insecure: true
+        resource_to_telemetry_conversion:
+          enabled: true
+      
+      # Debug exporter for troubleshooting
+      debug:
+        verbosity: detailed
+        sampling_initial: 5
+        sampling_thereafter: 200
+    
+    service:
+      extensions: [bearertokenauth]
+      pipelines:
+        # Traces pipeline: receive -> process -> export to Tempo and spanmetrics
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, resourcedetection, k8sattributes, batch]
+          exporters: [otlp/tempo, spanmetrics]
+        
+        # Metrics pipeline from spanmetrics connector
+        metrics/spanmetrics:
+          receivers: [spanmetrics]
+          processors: [memory_limiter, transform/spanmetrics, batch]
+          exporters: [prometheusremotewrite]
+        
+        # Regular metrics pipeline from applications
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, resourcedetection, k8sattributes, batch]
+          exporters: [prometheusremotewrite]
+        
+        # Logs pipeline (optional for future use)
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, resourcedetection, k8sattributes, batch]
+          exporters: [debug]

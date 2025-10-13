@@ -1,0 +1,12 @@
+---
+apiVersion: observability.openshift.io/v1alpha1
+kind: UIPlugin
+metadata:
+  name: monitoring
+  namespace: openshift-cluster-observability-operator
+spec:
+  type: Monitoring
+  monitoring:
+    # Enable Perses dashboards
+    perses:
+      enabled: true

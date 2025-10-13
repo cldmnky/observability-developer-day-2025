@@ -1,0 +1,18 @@
+apiVersion: monitoring.rhobs/v1
+kind: ServiceMonitor
+metadata:
+  name: python-api
+  namespace: observability-demo
+  labels:
+    monitoring.rhobs/stack: observability-stack
+    app.kubernetes.io/name: python-api
+    app.kubernetes.io/component: backend
+spec:
+  selector:
+    matchLabels:
+      app: python-api
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scheme: http

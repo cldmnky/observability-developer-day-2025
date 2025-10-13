@@ -1,8 +1,8 @@
-# Multi-arch build for Node.js web application
+# Multi-arch build for Python seed generator service
 # Supports aarch64 and amd64
 # Using Red Hat UBI9 images
 
-FROM --platform=$TARGETPLATFORM registry.access.redhat.com/ubi9/nodejs-20:latest
+FROM --platform=$TARGETPLATFORM registry.access.redhat.com/ubi9/python-312:latest
 
 ARG TARGETPLATFORM
 
@@ -10,15 +10,12 @@ USER 0
 
 WORKDIR /app
 
-# Copy package files
-COPY node/package*.json ./
+# Copy requirements and install dependencies
+COPY python/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install dependencies
-RUN npm ci --only=production
-
-# Copy application source
-COPY node/src/ ./src/
-COPY node/public/ ./public/
+# Copy application code
+COPY python/app.py .
 
 # Set ownership to root group and ensure group has same permissions as owner
 # This allows OpenShift to run the container with arbitrary UIDs in the root group
@@ -28,8 +25,8 @@ RUN chgrp -R 0 /app && \
 # Run as non-root user (default in UBI)
 USER 1001
 
-EXPOSE 4002
+EXPOSE 4004
 
-ENV PORT=4002
+ENV PORT=4004
 
-CMD ["npm", "start"]
+CMD ["python", "app.py"]
