@@ -1,12 +1,15 @@
 # Multi-arch build for Go name generator service
 # Supports aarch64 and amd64
+# Using Red Hat UBI9 images
 
-FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.24-alpine AS builder
+FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi9/go-toolset:latest AS builder
 
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 ARG TARGETOS
 ARG TARGETARCH
+
+USER 0
 
 WORKDIR /workspace
 
@@ -19,25 +22,19 @@ COPY go/ ./go/
 
 # Build the binary for the target architecture
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
-    go build -a -installsuffix cgo -o /app/api ./go/cmd/api
+    go build -a -o /workspace/api ./go/cmd/api
 
-# Final stage - minimal runtime image
-FROM --platform=$TARGETPLATFORM docker.io/library/alpine:latest
-
-RUN apk --no-cache add ca-certificates
+# Final stage - minimal runtime image using UBI9 micro
+FROM --platform=$TARGETPLATFORM registry.access.redhat.com/ubi9/ubi-micro:latest
 
 WORKDIR /app
 
 # Copy the binary from builder
-COPY --from=builder /app/api .
+COPY --from=builder /workspace/api .
 COPY go/data/*.csv ./data/
 
-# Run as non-root user
-RUN addgroup -S appuser && \
-    adduser -S -G appuser appuser && \
-    chown -R appuser:appuser /app
-
-USER appuser
+# Run as non-root user (default in UBI)
+USER 1001
 
 EXPOSE 4001
 

@@ -1,9 +1,12 @@
 # Multi-arch build for Node.js web application
 # Supports aarch64 and amd64
+# Using Red Hat UBI9 images
 
-FROM --platform=$TARGETPLATFORM docker.io/library/node:20-alpine
+FROM --platform=$TARGETPLATFORM registry.access.redhat.com/ubi9/nodejs-20:latest
 
 ARG TARGETPLATFORM
+
+USER 0
 
 WORKDIR /app
 
@@ -17,12 +20,11 @@ RUN npm ci --only=production
 COPY node/src/ ./src/
 COPY node/public/ ./public/
 
-# Run as non-root user
-RUN addgroup -S appuser && \
-    adduser -S -G appuser appuser && \
-    chown -R appuser:appuser /app
+# Change ownership to default user
+RUN chown -R 1001:0 /app
 
-USER appuser
+# Run as non-root user (default in UBI)
+USER 1001
 
 EXPOSE 4002
 
