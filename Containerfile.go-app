@@ -21,6 +21,7 @@ RUN go mod download
 COPY go/ ./go/
 
 # Build the binary for the target architecture
+# Using Go modules for proper versioning
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -a -o /workspace/api ./go/cmd/api
 
