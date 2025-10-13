@@ -10,6 +10,7 @@ import (
 	"time"
 
 	figure "github.com/common-nighthawk/go-figure"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/cldmnky/observability-developer-day-2025/go/data"
 	"github.com/cldmnky/observability-developer-day-2025/go/pkg/namer"
@@ -43,6 +44,7 @@ func NewServer(generator NameGenerator) *Server {
 	s.mux.HandleFunc("/healthz", s.handleHealth)
 	s.mux.HandleFunc("/api/name", s.handleName)
 	s.mux.HandleFunc("/api/figlet", s.handleFiglet)
+	s.mux.Handle("/metrics", promhttp.Handler())
 
 	return s
 }

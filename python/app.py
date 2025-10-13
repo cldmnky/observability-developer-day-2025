@@ -4,10 +4,14 @@ Provides seed values for lolcat colorization
 """
 import os
 import random
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST, CollectorRegistry
+
+# Create a custom registry to avoid conflicts
+metrics_registry = CollectorRegistry()
 
 app = FastAPI(
     title="Seed Generator API",
@@ -22,6 +26,18 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# Prometheus metrics
+seed_requests_counter = Counter(
+    'seed_requests_total', 
+    'Total number of seed generation requests',
+    registry=metrics_registry
+)
+seed_generation_duration = Histogram(
+    'seed_generation_duration_seconds',
+    'Time spent generating seeds',
+    registry=metrics_registry
 )
 
 class SeedResponse(BaseModel):
@@ -55,15 +71,23 @@ async def get_seed():
     import time
     import asyncio
     
-    # Add random delay to simulate processing time
-    delay = random.uniform(0.1, 5.0)
-    await asyncio.sleep(delay)
+    seed_requests_counter.inc()
     
-    seed = random.uniform(0.0, 1000.0)
+    # Add random delay to simulate processing time
+    with seed_generation_duration.time():
+        delay = random.uniform(0.1, 5.0)
+        await asyncio.sleep(delay)
+        seed = random.uniform(0.0, 1000.0)
+    
     return SeedResponse(
         seed=round(seed, 2),
         timestamp=time.time()
     )
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint"""
+    return Response(content=generate_latest(metrics_registry), media_type=CONTENT_TYPE_LATEST)
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "4004"))

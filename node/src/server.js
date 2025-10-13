@@ -1,9 +1,29 @@
 import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import client from 'prom-client';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Setup Prometheus metrics
+const register = new client.Registry();
+client.collectDefaultMetrics({ register });
+
+// Custom metrics
+const httpRequestDuration = new client.Histogram({
+  name: 'http_request_duration_seconds',
+  help: 'Duration of HTTP requests in seconds',
+  labelNames: ['method', 'route', 'status_code'],
+  registers: [register]
+});
+
+const workerRequestsTotal = new client.Counter({
+  name: 'worker_requests_total',
+  help: 'Total number of background worker requests',
+  labelNames: ['status'],
+  registers: [register]
+});
 
 const app = express();
 const PORT = process.env.PORT || 4002;
@@ -41,18 +61,22 @@ async function backgroundWorker() {
           const nameData = await nameResponse.json();
           stats.lastGeneratedName = nameData.names[0]?.combined || 'unknown';
           stats.successfulRequests++;
+          workerRequestsTotal.inc({ status: 'success' });
           
           console.log(`[Worker] Generated: ${stats.lastGeneratedName} (seed: ${stats.lastSeed})`);
         } else {
           stats.failedRequests++;
+          workerRequestsTotal.inc({ status: 'failed' });
           console.error('[Worker] Failed to generate name');
         }
       } else {
         stats.failedRequests++;
+        workerRequestsTotal.inc({ status: 'failed' });
         console.error('[Worker] Failed to fetch seed');
       }
     } catch (error) {
       stats.failedRequests++;
+      workerRequestsTotal.inc({ status: 'error' });
       console.error('[Worker] Error:', error.message);
     }
     
@@ -66,6 +90,12 @@ app.use(express.json());
 
 // Serve static files from public directory
 app.use(express.static(join(__dirname, '..', 'public')));
+
+// Prometheus metrics endpoint
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', register.contentType);
+  res.end(await register.metrics());
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
