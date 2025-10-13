@@ -9,6 +9,7 @@ const app = express();
 const PORT = process.env.PORT || 4002;
 const GO_API_BASE = process.env.GO_API_BASE || 'http://localhost:4001';
 const QUARKUS_API_BASE = process.env.QUARKUS_API_BASE || 'http://localhost:4003';
+const PYTHON_API_BASE = process.env.PYTHON_API_BASE || 'http://localhost:4004';
 
 // Parse JSON bodies
 app.use(express.json());
@@ -74,6 +75,30 @@ app.post('/api/figlet', async (req, res) => {
   }
 });
 
+// Proxy endpoint for Python API - Get seed
+app.get('/api/seed', async (req, res) => {
+  try {
+    const response = await fetch(`${PYTHON_API_BASE}/api/seed`);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({ 
+        error: 'Failed to fetch seed from Python API',
+        details: errorText 
+      });
+    }
+    
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error('Error proxying to Python API:', error);
+    res.status(500).json({ 
+      error: 'Failed to connect to Python API',
+      message: error.message 
+    });
+  }
+});
+
 // Proxy endpoint for Quarkus API - Lolcat
 app.post('/api/lolcat', async (req, res) => {
   try {
@@ -113,6 +138,7 @@ app.listen(PORT, () => {
 ║   Proxying to:                                           ║
 ║   - Go API:      ${GO_API_BASE}                    ║
 ║   - Quarkus API: ${QUARKUS_API_BASE}                    ║
+║   - Python API:  ${PYTHON_API_BASE}                    ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
   `);
