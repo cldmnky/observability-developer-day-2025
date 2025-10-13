@@ -16,16 +16,12 @@ spec:
       app: node-app
   template:
     metadata:
-      annotations:
-        sidecar.opentelemetry.io/inject: sidecar
-        instrumentation.opentelemetry.io/inject-nodejs: "demo-instrumentation"
       labels:
         app: node-app
         app.kubernetes.io/name: node-app
         app.kubernetes.io/component: frontend
         app.kubernetes.io/part-of: observability-stack
     spec:
-      serviceAccountName: otel-collector-sidecar
       containers:
       - name: node-app
         image: quay.io/cldmnky/observability-node-app:latest

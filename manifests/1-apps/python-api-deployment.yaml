@@ -16,16 +16,12 @@ spec:
       app: python-api
   template:
     metadata:
-      annotations:
-        sidecar.opentelemetry.io/inject: sidecar
-        instrumentation.opentelemetry.io/inject-python: "demo-instrumentation"
       labels:
         app: python-api
         app.kubernetes.io/name: python-api
         app.kubernetes.io/component: backend
         app.kubernetes.io/part-of: observability-stack
     spec:
-      serviceAccountName: otel-collector-sidecar
       containers:
       - name: python-api
         image: quay.io/cldmnky/observability-python-api:latest

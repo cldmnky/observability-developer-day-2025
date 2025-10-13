@@ -16,15 +16,12 @@ spec:
       app: go-api
   template:
     metadata:
-      annotations:
-        sidecar.opentelemetry.io/inject: sidecar
       labels:
         app: go-api
         app.kubernetes.io/name: go-api
         app.kubernetes.io/component: backend
         app.kubernetes.io/part-of: observability-stack
     spec:
-      serviceAccountName: otel-collector-sidecar
       containers:
       - name: go-api
         image: quay.io/cldmnky/observability-go-api:latest
