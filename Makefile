@@ -1,6 +1,6 @@
 .PHONY: help install start stop clean test dev go-service node-service quarkus-service python-service status \
 	container-build container-build-go container-build-node container-build-quarkus container-build-python \
-	container-push container-push-go container-push-node container-push-quarkus container-push-python \
+	container-clean container-push container-push-go container-push-node container-push-quarkus container-push-python \
 	container-run container-stop container-status container-logs \
 	python-env-help python-create-env python-check-env
 
@@ -229,6 +229,22 @@ demo: ## Run a quick demo of the stack
 	@echo "$(GREEN)✓ Demo complete!$(NC)"
 	@echo "$(YELLOW)Open http://localhost:$(NODE_PORT) in your browser to see the full UI$(NC)"
 
+container-clean: ## Clean all cached container images and manifests
+	@echo "$(YELLOW)Cleaning all cached container images and manifests...$(NC)"
+	@echo "$(YELLOW)Removing manifests...$(NC)"
+	-podman manifest rm $(REGISTRY)/observability-go-api:latest 2>/dev/null || true
+	-podman manifest rm $(REGISTRY)/observability-node-app:latest 2>/dev/null || true
+	-podman manifest rm $(REGISTRY)/observability-quarkus-api:latest 2>/dev/null || true
+	-podman manifest rm $(REGISTRY)/observability-python-api:latest 2>/dev/null || true
+	@echo "$(YELLOW)Removing images...$(NC)"
+	-podman rmi $(REGISTRY)/observability-go-api:latest 2>/dev/null || true
+	-podman rmi $(REGISTRY)/observability-node-app:latest 2>/dev/null || true
+	-podman rmi $(REGISTRY)/observability-quarkus-api:latest 2>/dev/null || true
+	-podman rmi $(REGISTRY)/observability-python-api:latest 2>/dev/null || true
+	@echo "$(YELLOW)Pruning dangling images...$(NC)"
+	-podman image prune -f 2>/dev/null || true
+	@echo "$(GREEN)✓ Container cleanup complete$(NC)"
+
 container-build-go: ## Build multi-arch Go service container
 	@echo "$(GREEN)Building multi-arch Go service container...$(NC)"
 	podman build --no-cache --platform=$(PLATFORMS) --manifest=$(REGISTRY)/observability-go-api:latest -f Containerfile.go-app .
@@ -249,7 +265,7 @@ container-build-python: ## Build multi-arch Python service container
 	podman build --no-cache --platform=$(PLATFORMS) --manifest=$(REGISTRY)/observability-python-api:latest -f Containerfile.python-app .
 	@echo "$(GREEN)✓ Python service container built$(NC)"
 
-container-build: container-build-go container-build-node container-build-quarkus container-build-python ## Build all multi-arch containers
+container-build: container-clean container-build-go container-build-node container-build-quarkus container-build-python ## Build all multi-arch containers
 
 container-push-go: ## Push Go service container to registry
 	@echo "$(GREEN)Pushing Go service container...$(NC)"
