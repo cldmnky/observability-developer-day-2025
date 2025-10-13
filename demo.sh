@@ -31,6 +31,12 @@ if command -v redhatsay &> /dev/null; then
     HAS_REDHATSAY=true
 fi
 
+# Check if bat is available
+HAS_BAT=false
+if command -v bat &> /dev/null; then
+    HAS_BAT=true
+fi
+
 # Check if gum is available
 HAS_GUM=false
 if command -v gum &> /dev/null; then
@@ -57,10 +63,15 @@ show_yaml() {
         explain "$description"
     fi
     
-    if [ "$HAS_GUM" = true ]; then
-        cat "$file" | gum format -t code -l yaml | less -R
+    if [ "$HAS_BAT" = true ]; then
+        bat --style=plain --color=always --language=yaml --paging=always "$file"
+    elif [ "$HAS_GUM" = true ]; then
+        gum format -t code -l yaml < "$file"
+        echo ""
+        echo "Press ENTER to continue..."
+        read -r
     else
-        cat "$file" | less -R
+        less -R "$file"
     fi
     clear
 }
@@ -72,37 +83,38 @@ clear
 
 cat << 'EOF'
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                           User Browser                                   │
-│                                                                           │
+│                           User Browser                                  │
+│                                                                         │
 │                    https://node-app-route.apps.cluster.com              │
 └────────────────────────────────┬────────────────────────────────────────┘
                                  │
                                  ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    observability-demo namespace                          │
-│                                                                           │
-│  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │                       Node.js Web App                             │  │
-│  │                          (port 3000)                              │  │
-│  │                                                                   │  │
-│  │  • Web UI with terminal emulator                                 │  │
-│  │  • Proxies requests to backend APIs                              │  │
-│  │  • Background worker: Python API → Go API (continuous polling)   │  │
-│  └────────┬────────────────────┬────────────────────┬───────────────┘  │
+│                    observability-demo namespace                         │
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │                       Node.js Web App                           │    │
+│  │                          (port 3000)                            │    │
+│  │                                                                 │    │
+│  │  • Web UI with terminal emulator                                │    │
+│  │  • Proxies requests to backend APIs                             │    │
+│  │  • Background worker: Python API → Go API (continuous polling)  │    │
+│  └────────┬────────────────────┬────────────────────┬──────────────┘    │
 │           │                    │                    │                   │
 │           ▼                    ▼                    ▼                   │
-│  ┌────────────────┐   ┌─────────────────┐   ┌───────────────────────┐ │
-│  │   Go API       │   │  Python API     │   │   Quarkus API         │ │
-│  │   (port 8080)  │   │  (port 8000)    │   │   (port 4003)         │ │
-│  │                │   │                 │   │                       │ │
-│  │ • Name gen     │   │ • Seed gen      │   │ • Lolcat colorize     │ │
-│  │ • ASCII art    │   │ • Random delay  │   │ • Rainbow ANSI        │ │
-│  │ • /metrics     │   │ • /metrics      │   │ • /metrics            │ │
-│  └────────────────┘   └─────────────────┘   └───────────────────────┘ │
-│                                                                           │
+│  ┌────────────────┐   ┌─────────────────┐   ┌───────────────────────┐   │
+│  │   Go API       │   │  Python API     │   │   Quarkus API         │   │
+│  │   (port 8080)  │   │  (port 8000)    │   │   (port 4003)         │   │
+│  │                │   │                 │   │                       │   │
+│  │ • Name gen     │   │ • Seed gen      │   │ • Lolcat colorize     │   │
+│  │ • ASCII art    │   │ • Random delay  │   │ • Rainbow ANSI        │   │
+│  │ • /metrics     │   │ • /metrics      │   │ • /metrics            │   │
+│  └────────────────┘   └─────────────────┘   └───────────────────────┘   │
+│                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 EOF
-
+wait
+clear
 echo ""
 echo "========================================="
 echo "  OpenShift Observability Demo"
