@@ -21,6 +21,7 @@ spec:
         app.kubernetes.io/name: node-app
         app.kubernetes.io/component: frontend
         app.kubernetes.io/part-of: observability-stack
+        demo: observability
     spec:
       containers:
       - name: node-app

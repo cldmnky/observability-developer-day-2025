@@ -21,6 +21,7 @@ spec:
         app.kubernetes.io/name: python-api
         app.kubernetes.io/component: backend
         app.kubernetes.io/part-of: observability-stack
+        demo: observability
     spec:
       containers:
       - name: python-api

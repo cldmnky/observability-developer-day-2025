@@ -75,11 +75,11 @@ explain "Deploying all 4 applications..."
 run_cmd "oc apply -f manifests/1-apps/"
 
 echo ""
-explain "Waiting for pods to be ready..."
-run_cmd "oc wait --for=condition=Ready pods --all -n observability-demo --timeout=120s"
+explain "Waiting for demo app pods to be ready..."
+run_cmd "oc wait --for=condition=Ready pods -l demo=observability -n observability-demo --timeout=120s"
 
 echo ""
-run_cmd "oc get pods -n observability-demo"
+run_cmd "oc get pods -l demo=observability -n observability-demo"
 
 pause
 
@@ -207,15 +207,15 @@ explain "Patching node-app deployment..."
 run_cmd "oc patch deployment node-app -n observability-demo -p '{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"sidecar.opentelemetry.io/inject\":\"sidecar\",\"instrumentation.opentelemetry.io/inject-nodejs\":\"demo-instrumentation\"}},\"spec\":{\"serviceAccountName\":\"otel-collector-sidecar\"}}}}'"
 
 echo ""
-explain "Waiting for pods to restart with instrumentation..."
+explain "Waiting for demo app pods to restart with instrumentation..."
 sleep 10
-run_cmd "oc wait --for=condition=Ready pods --all -n observability-demo --timeout=120s"
+run_cmd "oc wait --for=condition=Ready pods -l demo=observability -n observability-demo --timeout=120s"
 
 pause
 
 explain "Verifying instrumentation..."
 echo "Each pod should now have 2 containers: app + sidecar (otc-container)"
-run_cmd "oc get pods -n observability-demo"
+run_cmd "oc get pods -l demo=observability -n observability-demo"
 
 echo ""
 echo "Checking OTEL environment variables in python-api:"
