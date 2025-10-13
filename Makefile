@@ -231,22 +231,22 @@ demo: ## Run a quick demo of the stack
 
 container-build-go: ## Build multi-arch Go service container
 	@echo "$(GREEN)Building multi-arch Go service container...$(NC)"
-	podman build --platform=$(PLATFORMS) --manifest=$(REGISTRY)/observability-go-api:latest -f Containerfile.go-app .
+	podman build --no-cache --platform=$(PLATFORMS) --manifest=$(REGISTRY)/observability-go-api:latest -f Containerfile.go-app .
 	@echo "$(GREEN)✓ Go service container built$(NC)"
 
 container-build-node: ## Build multi-arch Node.js service container
 	@echo "$(GREEN)Building multi-arch Node.js service container...$(NC)"
-	podman build --platform=$(PLATFORMS) --manifest=$(REGISTRY)/observability-node-app:latest -f Containerfile.node-app .
+	podman build --no-cache --platform=$(PLATFORMS) --manifest=$(REGISTRY)/observability-node-app:latest -f Containerfile.node-app .
 	@echo "$(GREEN)✓ Node.js service container built$(NC)"
 
 container-build-quarkus: ## Build multi-arch Quarkus service container
 	@echo "$(GREEN)Building multi-arch Quarkus service container...$(NC)"
-	podman build --platform=$(PLATFORMS) --manifest=$(REGISTRY)/observability-quarkus-api:latest -f Containerfile.quarkus-app .
+	podman build --no-cache --platform=$(PLATFORMS) --manifest=$(REGISTRY)/observability-quarkus-api:latest -f Containerfile.quarkus-app .
 	@echo "$(GREEN)✓ Quarkus service container built$(NC)"
 
 container-build-python: ## Build multi-arch Python service container
 	@echo "$(GREEN)Building multi-arch Python service container...$(NC)"
-	podman build --platform=$(PLATFORMS) --manifest=$(REGISTRY)/observability-python-api:latest -f Containerfile.python-app .
+	podman build --no-cache --platform=$(PLATFORMS) --manifest=$(REGISTRY)/observability-python-api:latest -f Containerfile.python-app .
 	@echo "$(GREEN)✓ Python service container built$(NC)"
 
 container-build: container-build-go container-build-node container-build-quarkus container-build-python ## Build all multi-arch containers
