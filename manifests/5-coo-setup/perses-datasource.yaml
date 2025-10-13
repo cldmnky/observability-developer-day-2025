@@ -1,0 +1,27 @@
+---
+# PersesDatasource pointing directly to Prometheus in observability-demo
+# Using v1alpha1 (cluster supports this version)
+# Note: No Kubernetes Secret needed - Perses manages internal secrets automatically
+apiVersion: perses.dev/v1alpha1
+kind: PersesDatasource
+metadata:
+  name: observability-demo-prometheus
+  namespace: openshift-cluster-observability-operator
+  labels:
+    app.kubernetes.io/managed-by: observability-operator
+    monitoring.rhobs/stack: observability-stack
+spec:
+  config:
+    default: false  # Cannot be default - accelerators-thanos-querier-datasource is already default
+    display:
+      name: "Observability Demo - Prometheus"
+      description: "Direct connection to Prometheus in observability-demo MonitoringStack"
+    plugin:
+      kind: PrometheusDatasource
+      spec:
+        proxy:
+          kind: HTTPProxy
+          spec:
+            # Prometheus HTTP endpoint (port 9090)
+            # Using HTTP (not HTTPS) for internal service communication
+            url: 'http://observability-stack-prometheus.observability-demo.svc.cluster.local:9090'

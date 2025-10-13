@@ -16,12 +16,16 @@ spec:
       app: quarkus-api
   template:
     metadata:
+      annotations:
+        sidecar.opentelemetry.io/inject: sidecar
+        instrumentation.opentelemetry.io/inject-java: "demo-instrumentation"
       labels:
         app: quarkus-api
         app.kubernetes.io/name: quarkus-api
         app.kubernetes.io/component: backend
         app.kubernetes.io/part-of: observability-stack
     spec:
+      serviceAccountName: otel-collector-sidecar
       containers:
       - name: quarkus-api
         image: quay.io/cldmnky/observability-quarkus-api:latest
