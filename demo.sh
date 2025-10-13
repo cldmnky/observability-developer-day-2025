@@ -28,9 +28,19 @@ step() {
     echo ""
 }
 
+# Check if redhatsay is available
+HAS_REDHATSAY=false
+if command -v redhatsay &> /dev/null; then
+    HAS_REDHATSAY=true
+fi
+
 # Function to explain what we're doing
 explain() {
-    echo -e "${YELLOW}📝 $1${NC}"
+    if [ "$HAS_REDHATSAY" = true ]; then
+        redhatsay "📝 $1"
+    else
+        echo -e "${YELLOW}📝 $1${NC}"
+    fi
     echo ""
 }
 
