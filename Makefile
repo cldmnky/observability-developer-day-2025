@@ -1,7 +1,8 @@
 .PHONY: help install start stop clean test dev go-service node-service quarkus-service python-service status \
 	container-build container-build-go container-build-node container-build-quarkus container-build-python \
 	container-push container-push-go container-push-node container-push-quarkus container-push-python \
-	container-run container-stop container-status container-logs
+	container-run container-stop container-status container-logs \
+	python-env-help python-create-env python-check-env
 
 # Configuration
 GO_PORT ?= 4001
@@ -12,6 +13,10 @@ JAVA_HOME ?= /opt/homebrew/opt/openjdk@21
 MAVEN_PATH ?= /opt/apache-maven-3.8.8/bin
 REGISTRY ?= quay.io/cldmnky
 PLATFORMS ?= linux/amd64,linux/arm64
+
+# Python/Conda Configuration
+CONDA_ENV := observability-python
+CONDA_BASE := $(HOME)/miniforge3
 
 # Colors for output
 GREEN := \033[0;32m
@@ -30,6 +35,61 @@ help: ## Show this help message
 	@echo "  NODE_PORT=$(NODE_PORT)"
 	@echo "  QUARKUS_PORT=$(QUARKUS_PORT)"
 	@echo "  PYTHON_PORT=$(PYTHON_PORT)"
+	@echo "  CONDA_ENV=$(CONDA_ENV)"
+
+python-env-help: ## Show Python/Conda environment activation guide
+	@echo "$(GREEN)🐍 Conda Environment Activation Guide$(NC)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "Environment: $(CONDA_ENV)"
+	@echo "Location:    $(CONDA_BASE)"
+	@echo ""
+	@if [ ! -d "$(CONDA_BASE)" ]; then \
+		echo "$(RED)❌ Conda not installed. Please install miniforge3:$(NC)"; \
+		echo "   brew install miniforge"; \
+		exit 1; \
+	fi
+	@if ! eval "$$($(CONDA_BASE)/bin/conda shell.bash hook)" && conda env list | grep -q "^$(CONDA_ENV) "; then \
+		echo "$(YELLOW)⚠️  Environment '$(CONDA_ENV)' not found. Run: make python-create-env$(NC)"; \
+	else \
+		echo "$(GREEN)✓ Environment '$(CONDA_ENV)' exists$(NC)"; \
+	fi
+	@echo ""
+	@echo "To activate the conda environment manually:"
+	@echo ""
+	@echo "  eval \"\$$($(CONDA_BASE)/bin/conda shell.bash hook)\""
+	@echo "  conda activate $(CONDA_ENV)"
+	@echo ""
+	@echo "Or in one line:"
+	@echo ""
+	@echo "  eval \"\$$($(CONDA_BASE)/bin/conda shell.bash hook)\" && conda activate $(CONDA_ENV)"
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+python-create-env: ## Create Python conda environment
+	@echo "$(GREEN)Creating conda environment: $(CONDA_ENV)$(NC)"
+	@if [ ! -d "$(CONDA_BASE)" ]; then \
+		echo "$(RED)❌ Conda not installed. Please install miniforge3:$(NC)"; \
+		echo "   brew install miniforge"; \
+		exit 1; \
+	fi
+	@eval "$$($(CONDA_BASE)/bin/conda shell.bash hook)" && \
+	conda create -n $(CONDA_ENV) python=3.12 -y && \
+	conda activate $(CONDA_ENV) && \
+	pip install -r python/requirements.txt
+	@echo "$(GREEN)✓ Conda environment '$(CONDA_ENV)' created successfully$(NC)"
+	@echo "$(YELLOW)Activate with: eval \"\$$($(CONDA_BASE)/bin/conda shell.bash hook)\" && conda activate $(CONDA_ENV)$(NC)"
+
+python-check-env: ## Check if Python conda environment exists
+	@if [ ! -d "$(CONDA_BASE)" ]; then \
+		echo "$(RED)❌ Conda not installed$(NC)"; \
+		exit 1; \
+	fi
+	@if ! eval "$$($(CONDA_BASE)/bin/conda shell.bash hook)" && conda env list | grep -q "^$(CONDA_ENV) "; then \
+		echo "$(RED)❌ Environment '$(CONDA_ENV)' not found. Run: make python-create-env$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)✓ Environment '$(CONDA_ENV)' exists$(NC)"
 
 install: ## Install all dependencies for all services
 	@echo "$(GREEN)Installing dependencies...$(NC)"
@@ -37,8 +97,8 @@ install: ## Install all dependencies for all services
 	cd go && go mod download
 	@echo "$(YELLOW)Installing Node.js dependencies...$(NC)"
 	cd node && npm install
-	@echo "$(YELLOW)Installing Python dependencies...$(NC)"
-	cd python && pip install -r requirements.txt
+	@echo "$(YELLOW)Setting up Python conda environment...$(NC)"
+	@$(MAKE) python-check-env || $(MAKE) python-create-env
 	@echo "$(YELLOW)Verifying Java/Maven setup...$(NC)"
 	@export JAVA_HOME=$(JAVA_HOME) && export PATH=$(MAVEN_PATH):$$PATH && mvn --version
 	@echo "$(GREEN)✓ All dependencies installed$(NC)"
@@ -65,11 +125,13 @@ quarkus-service: ## Start the Quarkus lolcat service
 	@echo "$(GREEN)Starting Quarkus service on port $(QUARKUS_PORT)...$(NC)"
 	cd quarkus && export JAVA_HOME=$(JAVA_HOME) && export PATH=$(MAVEN_PATH):$$PATH && mvn quarkus:dev
 
-python-service: ## Start the Python seed generator service
+python-service: python-check-env ## Start the Python seed generator service
 	@echo "$(GREEN)Starting Python service on port $(PYTHON_PORT)...$(NC)"
+	@eval "$$($(CONDA_BASE)/bin/conda shell.bash hook)" && \
+	conda activate $(CONDA_ENV) && \
 	cd python && PORT=$(PYTHON_PORT) python app.py
 
-dev: ## Start all services in development mode (requires tmux)
+dev: python-check-env ## Start all services in development mode (requires tmux)
 	@echo "$(GREEN)Starting all services in development mode...$(NC)"
 	@if ! command -v tmux &> /dev/null; then \
 		echo "$(RED)Error: tmux is not installed. Please install tmux first.$(NC)"; \
@@ -83,8 +145,8 @@ dev: ## Start all services in development mode (requires tmux)
 	@tmux split-window -v -t observability-dev:0.1
 	@tmux send-keys -t observability-dev:0.0 'cd go && PORT=$(GO_PORT) go run ./cmd/api' C-m
 	@tmux send-keys -t observability-dev:0.1 'cd quarkus && export JAVA_HOME=$(JAVA_HOME) && export PATH=$(MAVEN_PATH):$$PATH && PORT=$(QUARKUS_PORT) mvn quarkus:dev' C-m
-	@tmux send-keys -t observability-dev:0.2 'cd python && PORT=$(PYTHON_PORT) python app.py' C-m
-	@tmux send-keys -t observability-dev:0.3 'cd node && PORT=$(NODE_PORT) npm start' C-m
+	@tmux send-keys -t observability-dev:0.2 'eval "$$($(CONDA_BASE)/bin/conda shell.bash hook)" && conda activate $(CONDA_ENV) && cd python && PORT=$(PYTHON_PORT) python app.py' C-m
+	@tmux send-keys -t observability-dev:0.3 'cd node && PORT=$(NODE_PORT) GO_API_BASE=http://localhost:$(GO_PORT) PYTHON_API_BASE=http://localhost:$(PYTHON_PORT) QUARKUS_API_BASE=http://localhost:$(QUARKUS_PORT) npm start' C-m
 	@tmux select-layout -t observability-dev:0 tiled
 	@echo "$(GREEN)✓ All services started in tmux session 'observability-dev'$(NC)"
 	@echo "$(YELLOW)Attach to session: tmux attach -t observability-dev$(NC)"
@@ -95,7 +157,7 @@ dev: ## Start all services in development mode (requires tmux)
 	@sleep 2
 	@make status
 
-start: ## Start all services in background (requires tmux)
+start: python-check-env ## Start all services in background (requires tmux)
 	@make dev
 
 stop: ## Stop all services running in tmux
