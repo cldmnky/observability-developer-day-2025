@@ -50,21 +50,25 @@ main() {
     # Build each service
     case "${1:-all}" in
         go)
-            build_and_push "observability-go-api" "Containerfile.go"
+            build_and_push "observability-go-api" "Containerfile.go-app"
             ;;
         node)
-            build_and_push "observability-node-app" "Containerfile.node"
+            build_and_push "observability-node-app" "Containerfile.node-app"
             ;;
         quarkus)
-            build_and_push "observability-quarkus-api" "Containerfile.quarkus"
+            build_and_push "observability-quarkus-api" "Containerfile.quarkus-app"
+            ;;
+        python)
+            build_and_push "observability-python-api" "Containerfile.python-app"
             ;;
         all)
-            build_and_push "observability-go-api" "Containerfile.go"
-            build_and_push "observability-node-app" "Containerfile.node"
-            build_and_push "observability-quarkus-api" "Containerfile.quarkus"
+            build_and_push "observability-go-api" "Containerfile.go-app"
+            build_and_push "observability-python-api" "Containerfile.python-app"
+            build_and_push "observability-node-app" "Containerfile.node-app"
+            build_and_push "observability-quarkus-api" "Containerfile.quarkus-app"
             ;;
         *)
-            echo -e "${RED}Usage: $0 [go|node|quarkus|all]${NC}"
+            echo -e "${RED}Usage: $0 [go|node|quarkus|python|all]${NC}"
             exit 1
             ;;
     esac
