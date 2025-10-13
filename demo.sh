@@ -70,6 +70,40 @@ explain "Let's do some OpenShift Observability magic 🎩 with Auto-Instrumentat
 wait
 clear
 
+cat << 'EOF'
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           User Browser                                   │
+│                                                                           │
+│                    https://node-app-route.apps.cluster.com              │
+└────────────────────────────────┬────────────────────────────────────────┘
+                                 │
+                                 ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    observability-demo namespace                          │
+│                                                                           │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │                       Node.js Web App                             │  │
+│  │                          (port 3000)                              │  │
+│  │                                                                   │  │
+│  │  • Web UI with terminal emulator                                 │  │
+│  │  • Proxies requests to backend APIs                              │  │
+│  │  • Background worker: Python API → Go API (continuous polling)   │  │
+│  └────────┬────────────────────┬────────────────────┬───────────────┘  │
+│           │                    │                    │                   │
+│           ▼                    ▼                    ▼                   │
+│  ┌────────────────┐   ┌─────────────────┐   ┌───────────────────────┐ │
+│  │   Go API       │   │  Python API     │   │   Quarkus API         │ │
+│  │   (port 8080)  │   │  (port 8000)    │   │   (port 4003)         │ │
+│  │                │   │                 │   │                       │ │
+│  │ • Name gen     │   │ • Seed gen      │   │ • Lolcat colorize     │ │
+│  │ • ASCII art    │   │ • Random delay  │   │ • Rainbow ANSI        │ │
+│  │ • /metrics     │   │ • /metrics      │   │ • /metrics            │ │
+│  └────────────────┘   └─────────────────┘   └───────────────────────┘ │
+│                                                                           │
+└─────────────────────────────────────────────────────────────────────────┘
+EOF
+
+echo ""
 echo "========================================="
 echo "  OpenShift Observability Demo"
 echo "  Auto-Instrumentation in Action"
@@ -196,6 +230,85 @@ clear
 
 step "Phase 3: Enable Distributed Tracing"
 
+explain "Here's how the observability stack architecture works:"
+echo ""
+cat << 'EOF' | less -R
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      APPLICATION PODS (observability-demo)                  │
+│                                                                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │   go-api    │  │ python-api  │  │ quarkus-api │  │  node-app   │         │
+│  │             │  │             │  │             │  │             │         │
+│  │  [app code] │  │  [app code] │  │  [app code] │  │  [app code] │         │
+│  │      ↓      │  │      ↓      │  │      ↓      │  │      ↓      │         │
+│  │ Auto-Instr  │  │ Auto-Instr  │  │ Auto-Instr  │  │ Auto-Instr  │         │
+│  │   (init)    │  │   (init)    │  │   (init)    │  │   (init)    │         │
+│  │      ↓      │  │      ↓      │  │      ↓      │  │      ↓      │         │
+│  │   OTLP →    │  │   OTLP →    │  │   OTLP →    │  │   OTLP →    │         │
+│  │  localhost  │  │  localhost  │  │  localhost  │  │  localhost  │         │
+│  │    :4318    │  │    :4318    │  │    :4318    │  │    :4318    │         │
+│  │      ↓      │  │      ↓      │  │      ↓      │  │      ↓      │         │
+│  │  [Sidecar]  │  │  [Sidecar]  │  │  [Sidecar]  │  │  [Sidecar]  │         │
+│  │  Collector  │  │  Collector  │  │  Collector  │  │  Collector  │         │
+│  │  :4317/:18  │  │  :4317/:18  │  │  :4317/:18  │  │  :4317/:18  │         │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘         │
+│         │                │                │                │                │
+│         └────────────────┴────────────────┴────────────────┘                │
+│                                  │                                          │
+│                                  ▼                                          │
+│                    ┌──────────────────────────────┐                         │
+│                    │   Central Collector          │                         │
+│                    │   (Deployment, 2 replicas)   │                         │
+│                    │                              │                         │
+│                    │  Receives: OTLP gRPC/HTTP    │                         │
+│                    │  Processes:                  │                         │
+│                    │   • Resource detection       │                         │
+│                    │   • K8s attributes           │                         │
+│                    │   • Batching                 │                         │
+│                    │                              │                         │
+│                    │  Connectors:                 │                         │
+│                    │   • Span→Metrics (RED)       │                         │
+│                    │                              │                         │
+│                    │  Exports:                    │                         │
+│                    │   • Traces → Tempo           │                         │
+│                    │   • Metrics → Prometheus     │                         │
+│                    └───────┬──────────────┬───────┘                         │
+│                            │              │                                 │
+└────────────────────────────┼──────────────┼─────────────────────────────────┘
+                             │              │
+            ┌────────────────┘              └──────────────────┐
+            ▼                                                  ▼
+┌───────────────────────────┐                  ┌─────────────────────────────┐
+│  openshift-tempo-operator │                  │   observability-demo        │
+│                           │                  │                             │
+│  ┌─────────────────────┐  │                  │  ┌───────────────────────┐  │
+│  │    TempoStack       │  │                  │  │   MonitoringStack     │  │
+│  │                     │  │                  │  │                       │  │
+│  │  • Distributor      │  │                  │  │  • Prometheus (x3)    │  │
+│  │  • Ingester         │  │                  │  │  • Alertmanager (x2)  │  │
+│  │  • Querier          │  │                  │  │  • Thanos Querier     │  │
+│  │  • Query Frontend   │  │                  │  │                       │  │
+│  │                     │  │                  │  │  ServiceMonitors:     │  │
+│  │  Storage: MinIO S3  │  │                  │  │   • go-api            |  │
+│  │  Retention: 48h     │  │                  │  │   • python-api        │  │
+│  │  Tenants: dev,prod  │  │                  │  │   • quarkus-api       │  │
+│  │                     │  │                  │  │   • node-app          │  │
+│  │  Jaeger UI: ✓       │  │                  │  │   • central-collector │  │
+│  └─────────────────────┘  │                  │  └───────────────────────┘  │
+└───────────────────────────┘                  └─────────────────────────────┘
+            │                                                  │
+            ▼                                                  ▼
+┌───────────────────────────┐                  ┌─────────────────────────────┐
+│  OpenShift Console        │                  │  OpenShift Console          │
+│                           │                  │                             │
+│  Observe → Traces         │                  │  Observe → Metrics          │
+│  (Distributed Tracing UI) │                  │  (Monitoring UI + Perses)   │
+└───────────────────────────┘                  └─────────────────────────────┘
+EOF
+
+wait
+clear
+
 explain "Step 1: Deploy RBAC for OpenTelemetry collectors"
 pei "oc apply -f manifests/4-opentelemetry/rbac.yaml"
 pei "oc apply -f manifests/4-opentelemetry/tempo-writer-rbac.yaml"
@@ -284,6 +397,81 @@ clear
 # ==========================================
 
 step "Phase 4: Visualize & Query"
+
+explain "Let's understand the request flow with instrumentation:"
+echo ""
+cat << 'EOF' | less -R
+User Request
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Node.js App Pod                                                 │
+│                                                                 │
+│  HTTP Request                                                   │
+│       ↓                                                         │
+│  ┌────────────────────────────────────────┐                     │
+│  │ Auto-Instrumentation (init container)  │                     │
+│  │ • Injects OpenTelemetry SDK            │                     │
+│  │ • Sets OTEL_* env vars                 │                     │
+│  │ • Configures OTLP endpoint             │                     │
+│  └────────────────────────────────────────┘                     │
+│       ↓                                                         │
+│  ┌────────────────────────────────────────┐                     │
+│  │ Express.js App (instrumented)          │                     │
+│  │ • Automatic span creation              │                     │
+│  │ • Context propagation (W3C)            │                     │
+│  │ • Trace ID in logs                     │                     │
+│  └────────────────────────────────────────┘                     │
+│       ↓ (OTLP to localhost:4318)                                │
+│  ┌────────────────────────────────────────┐                     │
+│  │ Sidecar Collector                      │                     │
+│  │ • Receives OTLP                        │                     │
+│  │ • Adds K8s metadata                    │                     │
+│  │ • Forwards to central                  │                     │
+│  └────────────────────────────────────────┘                     │
+│       ↓                                                         │
+└───────┼─────────────────────────────────────────────────────────┘
+        │
+        │ (calls Python API)
+        ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Python API Pod                                                  │
+│                                                                 │
+│  HTTP Request (with trace context in headers)                   │
+│       ↓                                                         │
+│  ┌────────────────────────────────────────┐                     │
+│  │ Auto-Instrumentation                   │                     │
+│  │ • Python OpenTelemetry agent           │                     │
+│  │ • Extracts parent trace context        │                     │
+│  │ • Creates child span                   │                     │
+│  └────────────────────────────────────────┘                     │
+│       ↓                                                         │
+│  ┌────────────────────────────────────────┐                     │
+│  │ FastAPI App (instrumented)             │                     │
+│  │ • GET /api/seed                        │                     │
+│  │ • Random delay (0.1s - 5s)             │                     │
+│  │ • Returns seed value                   │                     │
+│  └────────────────────────────────────────┘                     │
+│       ↓ (OTLP to localhost:4318)                                │
+│  ┌────────────────────────────────────────┐                     │
+│  │ Sidecar Collector                      │                     │
+│  └────────────────────────────────────────┘                     │
+│       ↓                                                         │
+└───────┼─────────────────────────────────────────────────────────┘
+        │
+        ▼
+    [Central Collector → Tempo/Prometheus]
+    
+    Complete Distributed Trace:
+    └─ node-app: GET /api/seed (proxy)
+       └─ python-api: GET /api/seed
+          ├─ duration: 2.3s
+          ├─ span attributes: http.method, http.status_code, k8s.pod.name
+          └─ exemplar linked to metric: traces_spanmetrics_latency
+EOF
+
+wait
+clear
 
 explain "Let's look at the Perses dashboard configuration..."
 show_yaml "manifests/5-coo-setup/working-dashboard.yaml" "📄 Perses Dashboard - Notice the panels for RED metrics and application metrics"
