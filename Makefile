@@ -1,6 +1,6 @@
 .PHONY: help install start stop clean test dev go-service node-service quarkus-service python-service status \
 	container-build container-build-go container-build-node container-build-quarkus container-build-python \
-	container-push container-push-go container-push-node container-push-quarkus container-push-python \
+	container-clean container-push container-push-go container-push-node container-push-quarkus container-push-python \
 	container-run container-stop container-status container-logs \
 	python-env-help python-create-env python-check-env
 
@@ -163,6 +163,22 @@ start: python-check-env ## Start all services in background (requires tmux)
 stop: ## Stop all services running in tmux
 	@echo "$(YELLOW)Stopping all services...$(NC)"
 	@tmux kill-session -t observability-dev 2>/dev/null || echo "$(YELLOW)No tmux session found$(NC)"
+	@echo "$(YELLOW)Checking for processes on service ports...$(NC)"
+	@killed=0; \
+	for port in $(GO_PORT) $(NODE_PORT) $(QUARKUS_PORT) $(PYTHON_PORT); do \
+		pid=$$(lsof -ti tcp:$$port 2>/dev/null); \
+		if [ -n "$$pid" ]; then \
+			echo "  $(YELLOW)Killing process $$pid on port $$port$(NC)"; \
+			kill -9 $$pid 2>/dev/null || true; \
+			killed=$$((killed + 1)); \
+		fi; \
+	done; \
+	if [ $$killed -eq 0 ]; then \
+		echo "  $(GREEN)No processes found on service ports$(NC)"; \
+	else \
+		echo "  $(GREEN)Killed $$killed process(es)$(NC)"; \
+	fi
+	@sleep 1
 	@echo "$(GREEN)✓ All services stopped$(NC)"
 
 status: ## Check the status of all services
@@ -229,6 +245,22 @@ demo: ## Run a quick demo of the stack
 	@echo "$(GREEN)✓ Demo complete!$(NC)"
 	@echo "$(YELLOW)Open http://localhost:$(NODE_PORT) in your browser to see the full UI$(NC)"
 
+container-clean: ## Clean all cached container images and manifests
+	@echo "$(YELLOW)Cleaning all cached container images and manifests...$(NC)"
+	@echo "$(YELLOW)Removing manifests...$(NC)"
+	-podman manifest rm $(REGISTRY)/observability-go-api:latest 2>/dev/null || true
+	-podman manifest rm $(REGISTRY)/observability-node-app:latest 2>/dev/null || true
+	-podman manifest rm $(REGISTRY)/observability-quarkus-api:latest 2>/dev/null || true
+	-podman manifest rm $(REGISTRY)/observability-python-api:latest 2>/dev/null || true
+	@echo "$(YELLOW)Removing images...$(NC)"
+	-podman rmi $(REGISTRY)/observability-go-api:latest 2>/dev/null || true
+	-podman rmi $(REGISTRY)/observability-node-app:latest 2>/dev/null || true
+	-podman rmi $(REGISTRY)/observability-quarkus-api:latest 2>/dev/null || true
+	-podman rmi $(REGISTRY)/observability-python-api:latest 2>/dev/null || true
+	@echo "$(YELLOW)Pruning dangling images...$(NC)"
+	-podman image prune -f 2>/dev/null || true
+	@echo "$(GREEN)✓ Container cleanup complete$(NC)"
+
 container-build-go: ## Build multi-arch Go service container
 	@echo "$(GREEN)Building multi-arch Go service container...$(NC)"
 	podman build --no-cache --platform=$(PLATFORMS) --manifest=$(REGISTRY)/observability-go-api:latest -f Containerfile.go-app .
@@ -249,7 +281,7 @@ container-build-python: ## Build multi-arch Python service container
 	podman build --no-cache --platform=$(PLATFORMS) --manifest=$(REGISTRY)/observability-python-api:latest -f Containerfile.python-app .
 	@echo "$(GREEN)✓ Python service container built$(NC)"
 
-container-build: container-build-go container-build-node container-build-quarkus container-build-python ## Build all multi-arch containers
+container-build: container-clean container-build-go container-build-node container-build-quarkus container-build-python ## Build all multi-arch containers
 
 container-push-go: ## Push Go service container to registry
 	@echo "$(GREEN)Pushing Go service container...$(NC)"

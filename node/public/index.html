@@ -220,38 +220,6 @@
     });
     
     // Utility functions
-    async function lolcatColorize(text) {
-      try {
-        // Validate input
-        if (!text || text.trim().length === 0) {
-          console.warn('Empty text passed to lolcatColorize');
-          return text;
-        }
-        
-        const response = await fetch('/api/lolcat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: text,
-            seed: 0.0,
-            spread: 3.0,
-            freq: 0.1
-          })
-        });
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Lolcat API error: ${response.status} ${response.statusText} - ${errorText}`);
-        }
-        
-        const { colorized } = await response.json();
-        return colorized;
-      } catch (error) {
-        console.warn('Lolcat colorization failed, using plain text:', error);
-        return text;
-      }
-    }
-    
     function writeLine(text, color = null) {
       // Note: writeLine should NOT use lolcat - that's only for ASCII art figures
       if (color) {
@@ -309,8 +277,9 @@
       return names.map(n => n.combined);
     }
     
-    async function fetchFiglet(names) {
-      const response = await fetch('/api/figlet', {
+    async function fetchFiglet(names, useLolcat = false) {
+      const url = useLolcat ? '/api/figlet?lolcat=true' : '/api/figlet';
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ names })
@@ -345,9 +314,13 @@
         const names = await fetchNames(count, seed);
         
         writeLine(`✓ Retrieved ${names.length} names`, '32'); // green
-        writeLine('⏳ Generating ASCII art...', '33');
+        if (useLolcat) {
+          writeLine('⏳ Generating ASCII art with lolcat colors...', '33');
+        } else {
+          writeLine('⏳ Generating ASCII art...', '33');
+        }
         
-        const artResults = await fetchFiglet(names);
+        const artResults = await fetchFiglet(names, useLolcat);
         
         writeLine('✓ ASCII art generated!', '32');
         writeLine('');
@@ -358,20 +331,12 @@
           writeLine('─'.repeat(120), '35');
           writeLine('');
           
-          // Write ASCII art with cyan color or lolcat, preserving exact formatting
+          // Write ASCII art - if lolcat is enabled, it's already colorized by Go API
           if (useLolcat) {
-            console.log('Colorizing with lolcat, figure length:', figure ? figure.length : 'undefined');
-            const colorizedArt = await lolcatColorize(figure);
-            if (colorizedArt) {
-              writeRaw(colorizedArt);
-            } else {
-              // Fallback to cyan if lolcat fails
-              console.warn('Lolcat returned empty, using fallback');
-              term.write('\x1b[36m'); // cyan
-              writeRaw(figure);
-              term.write('\x1b[0m'); // reset
-            }
+            // Figure already contains ANSI color codes from Quarkus lolcat service
+            writeRaw(figure);
           } else {
+            // Plain figlet, add cyan color
             term.write('\x1b[36m'); // cyan
             writeRaw(figure);
             term.write('\x1b[0m'); // reset
